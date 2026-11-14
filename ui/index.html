@@ -1379,7 +1379,16 @@ const firstVisible = () => adapters.findIndex(a => !hidden.has(a.id));
 const L = (en, th) => lang === "th" ? th : en;
 // Inside Octet, Tauri is here and the sample list above is replaced by this machine's adapters.
 const tauri = window.__TAURI__, invoke = tauri?.core.invoke;
-document.getElementById("win-close").onclick = () => tauri?.window.getCurrentWindow().hide();
+// In the tray nobody watches: Ping sleeps and a speed test stops. WebView2 doesn't always mark a hidden
+// window as document.hidden, so X says so itself. Sharing keeps being checked: that's why X hides, not quits.
+let inTray = false;
+document.getElementById("win-close").onclick = () => {
+  inTray = true;
+  if (speed.state === "run") speedEnd("stopped");
+  tauri?.window.getCurrentWindow().hide();
+};
+// Back from the tray (or the minimised taskbar): the window gets focus.
+window.addEventListener("focus", () => { if (inTray) { inTray = false; wakeProbe(); } });
 // Drag the window by the top strip or the header's empty space (on the element itself, not its buttons).
 document.addEventListener("mousedown", e => {
   if (e.button === 0 && e.target.hasAttribute?.("data-tauri-drag-region")) tauri?.window.getCurrentWindow().startDragging();
@@ -3521,9 +3530,9 @@ function probeBuild() {
   placeThumb(!fresh);
 }
 async function probeTick() {
-  // Minimised (or otherwise hidden): no pinging until the window shows again. Out of focus it keeps going.
+  // Minimised, in the tray or on another page: no pinging until Ping shows again. Out of focus it keeps going.
   // The graph's clock stops with it, so it picks up where it left off instead of stretching a line across the gap.
-  if (document.hidden) { probe.asleep = true; probe.sleptAt = performance.now(); return; }
+  if (document.hidden || inTray || page !== "probe") { if (!probe.asleep) { probe.asleep = true; probe.sleptAt = performance.now(); } return; }
   const t0 = Date.now();
   if (adapters[sel]) probeBuild();
   await Promise.all(probe.rows.filter(r => r.target).map(async r => {
@@ -3700,6 +3709,7 @@ $("probe-graph").addEventListener("pointermove", e => { probe.hx = e.clientX - e
 $("probe-graph").addEventListener("pointerleave", () => { probe.hx = null; gfx.wait = 0; });
 function probeShow(on) {
   if (!on) return;
+  wakeProbe();
   if (adapters[sel]) probeBuild();
   paintProbe(); placeThumb(false); alignFoot();
   wakeGraph();
@@ -3727,7 +3737,8 @@ function centreUnder(foot, over, pageEl) {
   Object.assign(foot.style, { marginLeft: `${g.left - dx - b.left - pad}px`, marginRight: `${b.right - pad - (g.right - dx)}px` });
 }
 new ResizeObserver(alignFoot).observe($("probe-graph"));
-document.addEventListener("visibilitychange", () => { if (!document.hidden && probe.asleep) { probe.asleep = false; probe.slept += performance.now() - probe.sleptAt; probeTick(); } });
+function wakeProbe() { if (!document.hidden && !inTray && page === "probe" && probe.asleep) { probe.asleep = false; probe.slept += performance.now() - probe.sleptAt; probeTick(); } }
+document.addEventListener("visibilitychange", wakeProbe);
 // ---------- Speed test: its own view, opened from the sidebar ----------
 // Download, then upload, against Cloudflare, out through the adapter on screen only (Rust pins the socket to it).
 // Nothing runs until Start. Another adapter, or closing the view, stops a test that is running.
