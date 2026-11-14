@@ -137,10 +137,11 @@ async fn who_has(address: String) -> Result<Option<String>, String> {
 
 /// Round trip in ms, or None. With `source` (the adapter's address) it goes out through that adapter.
 #[tauri::command]
-async fn ping(address: String, source: Option<String>) -> Result<Option<u32>, String> {
+/// `timeout` in ms, 1500 when not given (Scan's network search asks for less).
+async fn ping(address: String, source: Option<String>, timeout: Option<u32>) -> Result<Option<u32>, String> {
     let ip: Ipv4Addr = address.parse().map_err(|_| "Not an IPv4 address".to_string())?;
     let from = source.and_then(|s| s.parse().ok());
-    blocking(move || Ok(net::ping(ip, from, 1500))).await
+    blocking(move || Ok(net::ping(ip, from, timeout.unwrap_or(1500).clamp(100, 1500)))).await
 }
 
 /// A TCP connect to `port`: {"open": ms}, {"closed": ms} (refused: the device is there), or null (nothing answered).

@@ -1447,6 +1447,9 @@ const demoInvoke = (cmd, a = {}) => new Promise((res, rej) => setTimeout(() => {
     return res(kind.includes(a.port) ? { open: 1 + (h + a.port) % 6 } : null);
   }
   if (cmd === "tcping") return res(a.port === 9 ? null : a.port === 23 ? { closed: 2 } : { open: /^(10|192\.168)\./.test(a.address) ? 2 + Math.floor(Math.random() ** 3 * 6) : 16 + Math.floor(Math.random() ** 2 * 9) });
+  // Scan's network search: only a few 192.168 networks are out there (plus the adapters' own gateways).
+  if (cmd === "ping" && /^192\.168\.\d+\.(1|254)$/.test(a.address) && ![30, 88].includes(+a.address.split(".")[2])
+    && !adapters.some(x => x.cfg.gateway === a.address)) return res(null);
   if (cmd === "ping") return res(demo.pingFail && a.address !== "8.8.8.8" || demo.proxyArp && a.address !== adapters[sel].cfg.gateway ? null : { ms: /^(10|192\.168)\./.test(a.address) ? 1 + Math.floor(Math.random() ** 3 * 5) : 14 + Math.floor(Math.random() ** 2 * 8), ttl: /^(10|192\.168)\./.test(a.address) ? 64 : 117 });
   // Sharing: the RB5009 asks for an address and turns up in the shared range; a phone joins a little later.
   if (cmd === "neighbours") { const b = (sharing()?.scope || "192.168.137.1").split(".").slice(0, 3).join("."), t = (Date.now() - (sharing()?.at || 0)) / 1000;
@@ -4372,7 +4375,8 @@ function scanPick(h, cell) {
 // The box shows the range on screen unless you are typing in it.
 function scanChips(a, basis, live) {
   [...scanOwn.inputs, $("scan-own-pfx"), $("scan-pick")].forEach(x => x.disabled = !live);
-  if ($("scan-own").contains(document.activeElement)) return;
+  // Left alone only while you type in it: a pick from the list (focus on the list or the caret) still shows.
+  if ([...scanOwn.inputs, $("scan-own-pfx")].includes(document.activeElement)) return;
   scanOwn.set(live ? numIp(netOf(basis.ip, basis.prefix)) : "", live, true);
   $("scan-own-pfx").value = live ? basis.prefix : "";
 }
@@ -4414,10 +4418,60 @@ function setScanPicks(open) {
     b.onclick = e => { e.stopPropagation(); clearTimeout(scanWait); setScanPicks(false); scan.pick = i ? r : null; scan.pickFor = a.id; scanStart(true); $("scan-pick").focus(); };
     m.append(b);
   });
+  // Networks found past the router (Find networks), then the button that looks for them.
+  const own = scanRanges(a), found = foundNets(a).filter(f => !own.some(o => netOf(o.ip, 24) === netOf(f.ip, 24)));
+  found.forEach((r, k) => {
+    const b = document.createElement("button"); b.setAttribute("role", "menuitem"); b.style.setProperty("--i", own.length + k);
+    const on = cur && cur.prefix === r.prefix && netOf(cur.ip, r.prefix) === netOf(r.ip, r.prefix);
+    b.className = on ? "on" : "";
+    b.innerHTML = `<i class="ph ph-path"></i><span></span><em></em>`;
+    b.children[1].textContent = `${r.ip}/${r.prefix}`;
+    b.children[2].textContent = L("via router", "ผ่าน Router");
+    b.onclick = e => { e.stopPropagation(); clearTimeout(scanWait); setScanPicks(false); scan.pick = r; scan.pickFor = a.id; scanStart(true); $("scan-pick").focus(); };
+    m.append(b);
+  });
+  const f = document.createElement("button"); f.setAttribute("role", "menuitem"); f.className = "sfind"; f.style.setProperty("--i", own.length + found.length);
+  f.innerHTML = `<i class="ph ph-magnifying-glass"></i><span></span><em></em>`;
+  f.children[1].textContent = L("Find networks", "หาวงอื่น");
+  f.title = L("Pings .1 and .254 of every 192.168.x network through the router; the ones that answer join this list",
+    "ping .1 และ .254 ของทุกวง 192.168.x ผ่าน Router วงที่ตอบจะเพิ่มในรายการนี้");
+  f.onclick = e => { e.stopPropagation(); findNets(a, f); };
+  m.append(f);
   m.style.height = `${m.scrollHeight}px`;
   (m.querySelector("button.on") || m.querySelector("button"))?.focus({ preventScroll: true });
 }
 menuKeys($("scan-picks"), $("scan-pick"), () => setScanPicks(false));
+// Find networks: no router can be asked, so guess. Most gateways sit on .1 or .254: ping both on every
+// 192.168.x/24 through the router, 128 at a time, 400 ms each (~2 s). Pressed by hand only: a sweep on someone's
+// network can look like an attack. What answers is kept per adapter and gateway, so the same place needs no new search.
+// ponytail: 192.168.x only, gateways on .1/.254 only; 10.x and 172.16-31 are too wide to guess blindly.
+const foundKey = a => `${a.id}|${a.cfg.gateway}`;
+const foundAll = () => { try { return JSON.parse(pref("octet-found") || "{}"); } catch { return {}; } };
+const foundNets = a => foundAll()[foundKey(a)] || [];
+async function findNets(a, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const todo = [...Array(256).keys()].flatMap(x => [`192.168.${x}.1`, `192.168.${x}.254`]), hits = new Set();
+  let done = 0, at = 0;
+  const say = () => btn.children[1].textContent = L(`Finding… ${Math.round(done / todo.length * 100)}%`, `กำลังหา… ${Math.round(done / todo.length * 100)}%`);
+  say();
+  await Promise.all([...Array(128)].map(async () => {
+    while (at < todo.length) {
+      const ip = todo[at++];
+      if (await net("ping", { address: ip, source: a.cfg.address, timeout: 400 }).catch(() => null)) hits.add(+ip.split(".")[2]);
+      done++; if (done % 16 === 0) say();
+    }
+  }));
+  const nets = [...hits].sort((x, y) => x - y).map(x => ({ ip: `192.168.${x}.0`, prefix: 24 }));
+  const all = foundAll(); all[foundKey(a)] = nets; keep("octet-found", JSON.stringify(all));
+  // Reopen the list with what was found (or say nothing was).
+  setScanPicks(false); setScanPicks(true);
+  const own = scanRanges(a);
+  if (!nets.some(n => !own.some(o => netOf(o.ip, 24) === netOf(n.ip, 24)))) {
+    const f = $("scan-picks").querySelector(".sfind");
+    if (f) f.children[1].textContent = L("No other network answered", "ไม่เจอวงอื่นตอบ");
+  }
+}
 $("scan-pick").onclick = e => { e.stopPropagation(); setScanPicks(!$("scan-own").classList.contains("open")); };
 document.addEventListener("click", e => { if (!e.target.closest("#scan-own")) setScanPicks(false); });
 $("scan-own-pfx").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, ""); scanTyped(); });
