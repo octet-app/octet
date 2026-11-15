@@ -4,6 +4,8 @@ mod adapters;
 mod change;
 #[cfg(windows)]
 mod ics;
+mod lldp;
+mod mcp;
 #[cfg(windows)]
 mod win;
 #[cfg(target_os = "macos")]
@@ -126,6 +128,13 @@ async fn share_state() -> Result<Option<serde_json::Value>, String> {
 async fn mndp(address: String) -> Result<Vec<net::Mndp>, String> {
     let ip: Ipv4Addr = address.parse().map_err(|_| "Not an IPv4 address".to_string())?;
     blocking(move || net::mndp(ip, 1500)).await
+}
+
+/// Which switch and port this adapter's cable goes to: waits for its CDP or LLDP announcement (they come every
+/// 30-60 s). None: nothing heard in time.
+#[tauri::command]
+async fn switch_port(id: String, secs: Option<u64>) -> Result<Option<lldp::Neighbour>, String> {
+    blocking(move || lldp::listen(&id, secs.unwrap_or(65).min(120))).await
 }
 
 /// Before Apply: does another device already answer ARP for this address?
@@ -371,6 +380,12 @@ fn main() {
     if let [_, flag, request, out, id @ ..] = args.as_slice() && flag == "--elevated" {
         std::process::exit(change::run_elevated(request, out, id.first().map(String::as_str)));
     }
+    // An AI's read-only tools over stdin/stdout (see mcp.rs): no window, no single-instance hand-off, never elevated.
+    // A GUI-subsystem exe still reads and writes the pipes its launcher gives it.
+    if args.get(1).is_some_and(|a| a == "--mcp") {
+        mcp::run();
+        return;
+    }
     // Running as administrator (Always run as admin): WebView2 takes extra browser arguments, even another browser
     // folder, from WEBVIEW2_* variables, which any program of yours can set (HKCU\Environment). One of them opens a
     // debugging port, through which a program without admin rights could drive this window and change the network.
@@ -469,7 +484,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            read_adapters, change, tray_update, flush_dns, who_has, neighbours, share_state, mndp, ping, tcping, open_device, scan_host, speed_test, speed_stop, hostname, vendor, computer_name, public_ip, open_ncpa, open_link, system_info, send_feedback, update_check, update_install, update_restart, ready, admin_state, set_always_admin, restart_as_admin
+            read_adapters, change, tray_update, flush_dns, who_has, neighbours, share_state, mndp, switch_port, ping, tcping, open_device, scan_host, speed_test, speed_stop, hostname, vendor, computer_name, public_ip, open_ncpa, open_link, system_info, send_feedback, update_check, update_install, update_restart, ready, admin_state, set_always_admin, restart_as_admin
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Octet")

@@ -86,7 +86,14 @@ pub(crate) struct Raw {
     pub(crate) wifi: Option<Wifi>,
     /// macOS: the service's IPv4 is turned off (Release does that there); Renew turns DHCP back on.
     #[serde(skip)]
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) ipv4_off: bool,
+    /// IPv6 is bound to the adapter (Windows: the ms_tcpip6 binding; macOS: the service's IPv6 isn't Off).
+    #[serde(skip)]
+    pub(crate) ipv6_on: bool,
+    /// The driver's 802.1Q VLAN ID: None when the driver has no `VlanID` setting, Some(0) when none is set.
+    #[serde(skip)]
+    pub(crate) vlan: Option<u16>,
 }
 
 /// The joined Wi-Fi network, for Info: signal 0-100, the access point's MAC, and how it is secured.
@@ -173,6 +180,10 @@ pub struct Adapter {
     /// an end of 4294967295000, Windows' 0xFFFFFFFF seconds, is a lease that never ends), Wi-Fi details.
     pub suffix: String,
     pub ipv6: Vec<String>,
+    /// IPv6 on for this adapter (Info's switch).
+    pub ipv6_on: bool,
+    /// VLAN ID the driver tags with: None = the driver can't, Some(0) = none.
+    pub vlan: Option<u16>,
     pub lease_got: u64,
     pub lease_ends: u64,
     pub wifi: Option<Wifi>,
@@ -260,6 +271,8 @@ fn shape(raw: Vec<Raw>) -> Vec<Adapter> {
                 extra_gws: gws.iter().skip(1).map(|g| g.gateway.clone()).collect(),
                 suffix: r.suffix,
                 ipv6: r.ipv6,
+                ipv6_on: r.ipv6_on,
+                vlan: r.vlan,
                 lease_got: if apipa { 0 } else { r.lease_got },
                 lease_ends: if apipa { 0 } else { r.lease_ends },
                 wifi: r.wifi,
@@ -783,17 +796,20 @@ mod native {
             let tcp = format!(r"{TCPIP}\{id}");
             // Typed-in DNS servers are kept here; DHCP-given ones are not.
             let static_dns = reg_text(&tcp, "NameServer").is_some_and(|s| !s.is_empty());
-            entries.push((id, name, tcp, static_dns, device(&instance)));
+            // The standard VlanID keyword: the driver offers it when its Ndi\Params has it; no value set = 0.
+            let vlan = reg_text(&format!(r"{drv}\Ndi\Params\VlanID"), "type")
+                .map(|_| reg_text(&drv, "VlanID").and_then(|v| v.trim().parse().ok()).unwrap_or(0));
+            entries.push((id, name, tcp, static_dns, device(&instance), vlan));
         }
         // ALL_INTERFACES only adds interfaces with no IPv4 binding: if a present adapter is one of them
         // (e.g. a Hyper-V external-switch card) or the lean call failed, ask again exactly as before.
         // ponytail: on a machine with a present IPv4-unbound adapter every read pays both calls (lean + full, the full one serial after the join); remember which GUIDs need it if that hurts.
         let mut live = match lean {
-            Ok(m) if entries.iter().all(|(id, .., d)| !matches!(d, Device::Present) || m.contains_key(id)) => m,
+            Ok(m) if entries.iter().all(|(id, .., d, _)| !matches!(d, Device::Present) || m.contains_key(id)) => m,
             _ => live(V4_FULL)?,
         };
         let mut out = vec![];
-        for (id, name, tcp, static_dns, device) in entries {
+        for (id, name, tcp, static_dns, device, vlan) in entries {
             match device {
                 Device::Missing => {}
                 Device::Present => {
@@ -801,11 +817,15 @@ mod native {
                     let Some(mut raw) = live.remove(&id) else { continue };
                     raw.name = name;
                     raw.static_dns = static_dns;
+                    raw.vlan = vlan;
                     let w = wlans.remove(&id);
                     raw.wifi = w.as_ref().filter(|w| !w.ssid.is_empty()).map(|w| w.wifi.clone());
                     let w = w.unwrap_or_default();
                     (raw.ssid, raw.phy, raw.mhz) = (w.ssid, w.phy, w.mhz);
                     raw.ipv6 = v6.remove(&id).unwrap_or_default();
+                    // Unbound (Info's switch off): Windows has no IPv6 interface for it at all.
+                    let mut row = MIB_IPINTERFACE_ROW { Family: AF_INET6, InterfaceIndex: raw.index, ..Default::default() };
+                    raw.ipv6_on = unsafe { GetIpInterfaceEntry(&mut row) } == 0;
                     raw.metered = metered.contains(&id);
                     // The lease, in seconds since 1970, as Windows keeps it for the interface.
                     if raw.dhcp && raw.status == "Up" {

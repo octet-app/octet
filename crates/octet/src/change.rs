@@ -40,6 +40,10 @@ pub enum Request {
     /// `cycle`: release first, in the same elevated run (one password prompt on macOS).
     Renew { index: u32, name: String, #[serde(default)] cycle: bool },
     Enable { index: u32, name: String, on: bool },
+    /// IPv6 on or off for one adapter (Info's switch); IPv4 is left as it is.
+    Ipv6 { index: u32, name: String, on: bool },
+    /// Windows: the driver's 802.1Q VLAN ID (0 = none). The adapter reconnects for a few seconds.
+    Vlan { index: u32, name: String, id: u16 },
     /// macOS only: emptying the DNS cache needs root there (Windows does it in-process).
     FlushDns,
     /// Internet Sharing from `public` (has the internet) to `private`: Windows' ICS, or macOS's Internet Sharing.
@@ -73,6 +77,10 @@ const ADDRESS: &str = "octet:address";
 const ENABLE: &str = "octet:enable";
 #[cfg(windows)]
 const METRIC: &str = "octet:metric";
+#[cfg(windows)]
+const IPV6: &str = "octet:ipv6";
+#[cfg(windows)]
+const VLAN: &str = "octet:vlan";
 const SHARE: &str = "octet:share";
 /// Windows: one more or one fewer Advanced address / default gateway (see `crate::win`).
 #[cfg(windows)]
@@ -115,7 +123,9 @@ pub fn commands(r: &Request) -> Result<Vec<Vec<String>>, String> {
         Request::Apply { index, name, .. }
         | Request::Release { index, name }
         | Request::Renew { index, name, .. }
-        | Request::Enable { index, name, .. } => (*index, name),
+        | Request::Enable { index, name, .. }
+        | Request::Ipv6 { index, name, .. }
+        | Request::Vlan { index, name, .. } => (*index, name),
         Request::FlushDns if cfg!(target_os = "macos") => return Ok(vec![cmd(&["dscacheutil", "-flushcache"]), cmd(&["killall", "-HUP", "mDNSResponder"])]),
         Request::FlushDns => return Ok(vec![]),
         Request::Share { public, private, on, scope, restore } => {
@@ -182,6 +192,8 @@ fn platform(r: &Request, index: u32, name: &str) -> Result<Vec<Vec<String>>, Str
             out
         }
         Request::Enable { on, .. } => vec![ns(&["-setnetworkserviceenabled", name, if *on { "on" } else { "off" }])],
+        Request::Ipv6 { on, .. } => vec![ns(&[if *on { "-setv6automatic" } else { "-setv6off" }, name])],
+        Request::Vlan { .. } => return Err("On a Mac a VLAN is a separate interface (System Settings > Network > ... > Manage Virtual Interfaces)".into()),
         Request::Apply { cfg, ip, dns, extra, was_extra, was_metric, was_first, .. } => {
             if *ip && !cfg.ip_auto && cfg.dns_auto {
                 return Err("A static IP needs manual DNS".into());
@@ -288,6 +300,9 @@ fn platform(r: &Request, index: u32, _name: &str) -> Result<Vec<Vec<String>>, St
         Request::Enable { on, .. } => {
             vec![cmd(&[ENABLE, &index.to_string(), if *on { "on" } else { "off" }])]
         }
+        Request::Ipv6 { on, .. } => vec![cmd(&[IPV6, &index.to_string(), if *on { "on" } else { "off" }])],
+        Request::Vlan { id, .. } if *id > 4094 => return Err("A VLAN ID is 1 to 4094 (0 = none)".into()),
+        Request::Vlan { id, .. } => vec![cmd(&[VLAN, &index.to_string(), &id.to_string()])],
         Request::Apply { cfg, ip, dns, extra, was_extra, was_gws, was_metric, was_first, .. } => {
             if *ip && !cfg.ip_auto && cfg.dns_auto {
                 return Err("A static IP needs manual DNS".into());
@@ -542,7 +557,7 @@ pub fn run_elevated(request_hex: &str, out: &str, id: Option<&str>) -> i32 {
 fn run(cmds: Vec<Vec<String>>) -> Result<(), String> {
     for c in cmds {
         #[cfg(windows)]
-        if matches!(c[0].as_str(), ADDRESS | XADDR | GW | FIRST | ENABLE | METRIC | SHARE) {
+        if matches!(c[0].as_str(), ADDRESS | XADDR | GW | FIRST | ENABLE | METRIC | IPV6 | VLAN | SHARE) {
             let index = c[1].parse().map_err(|_| "Bad interface index")?;
             match c[0].as_str() {
                 ADDRESS => crate::win::set_address(index, c.get(3).map(|m| (c[2].as_str(), m.as_str())))?,
@@ -550,6 +565,8 @@ fn run(cmds: Vec<Vec<String>>) -> Result<(), String> {
                 GW => crate::win::gateway(index, &c[3], c.get(4).map(|m| m.parse().map_err(|_| "Bad metric")).transpose()?)?,
                 FIRST => crate::win::first(index, Some(c[2].as_str()).filter(|g| *g != "none"))?,
                 ENABLE => crate::win::enable(index, c[2] == "on")?,
+                IPV6 => crate::win::ipv6(index, c[2] == "on")?,
+                VLAN => crate::win::vlan(index, c[2].parse().map_err(|_| "Bad VLAN ID")?)?,
                 METRIC => crate::win::set_metric(index, if c[2] == "auto" { None } else { Some(c[2].parse().map_err(|_| "Bad metric")?) })?,
                 SHARE => crate::ics::set(index, c[2].parse().map_err(|_| "Bad interface index")?, c[3] == "on", c.get(4).map(String::as_str))?,
                 _ => unreachable!(),
@@ -605,6 +622,27 @@ mod tests {
             register: false,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn ipv6_switch_commands() {
+        let on = commands(&Request::Ipv6 { index: 7, name: "Ethernet".into(), on: true }).unwrap();
+        let off = commands(&Request::Ipv6 { index: 7, name: "Ethernet".into(), on: false }).unwrap();
+        #[cfg(windows)]
+        assert_eq!((on, off), (vec![cmd(&[IPV6, "7", "on"])], vec![cmd(&[IPV6, "7", "off"])]));
+        #[cfg(target_os = "macos")]
+        assert_eq!((on, off), (vec![cmd(&["networksetup", "-setv6automatic", "Ethernet"])], vec![cmd(&["networksetup", "-setv6off", "Ethernet"])]));
+        assert!(commands(&Request::Ipv6 { index: 7, name: "-x".into(), on: true }).is_err(), "names are checked as for every other request");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn vlan_ids_checked() {
+        let v = |id| commands(&Request::Vlan { index: 4, name: "Ethernet 4".into(), id });
+        assert_eq!(v(0).unwrap(), [cmd(&[VLAN, "4", "0"])]);
+        assert_eq!(v(10).unwrap(), [cmd(&[VLAN, "4", "10"])]);
+        assert_eq!(v(4094).unwrap(), [cmd(&[VLAN, "4", "4094"])]);
+        assert!(v(4095).is_err(), "4095 is reserved");
     }
 
     #[test]

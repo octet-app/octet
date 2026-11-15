@@ -200,6 +200,36 @@ pub fn enable(index: u32, on: bool) -> Result<()> {
     wmi.call(&nic, if on { "Enable" } else { "Disable" }, &[])
 }
 
+/// IPv6 on or off for one adapter: its ms_tcpip6 binding, as the adapter's Properties checkbox (Disable-NetAdapterBinding).
+/// The binding is named by the adapter's GUID (`{GUID}::ms_tcpip6`), found from the index.
+pub fn ipv6(index: u32, on: bool) -> Result<()> {
+    let wmi = Wmi::connect(r"ROOT\StandardCimv2")?;
+    let guid = adapter_guid(&wmi, index)?;
+    let binding = wmi.one(&format!("SELECT * FROM MSFT_NetAdapterBindingSettingData WHERE InstanceID='{guid}::ms_tcpip6'"), None)?;
+    wmi.call(&binding, if on { "Enable" } else { "Disable" }, &[])
+}
+
+/// The driver's VLAN ID (0 = none), as Set-NetAdapterAdvancedProperty -RegistryKeyword VlanID: Windows writes it
+/// and restarts the adapter. Only the standard keyword; a driver without it gets "Windows does not list that adapter".
+pub fn vlan(index: u32, id: u16) -> Result<()> {
+    let wmi = Wmi::connect(r"ROOT\StandardCimv2")?;
+    let guid = adapter_guid(&wmi, index)?;
+    let prop = wmi.one(&format!("SELECT * FROM MSFT_NetAdapterAdvancedPropertySettingData WHERE InstanceID='{guid}::VlanID'"), None)?;
+    put(&prop, "RegistryValue", &strings(&[&id.to_string()])?)?;
+    unsafe { wmi.svc.PutInstance(&prop, WBEM_GENERIC_FLAG_TYPE(WBEM_FLAG_UPDATE_ONLY.0), None, None) }.map_err(|e| format!("Could not set the VLAN ID: {e}"))
+}
+
+/// The adapter's GUID ("{...}"), which names its bindings and advanced settings.
+fn adapter_guid(wmi: &Wmi, index: u32) -> Result<String> {
+    let nic = wmi.one(&format!("SELECT DeviceID FROM MSFT_NetAdapter WHERE InterfaceIndex={index}"), None)?;
+    let guid = BSTR::try_from(&get(&nic, "DeviceID")?).map_err(|e| e.to_string())?.to_string();
+    // A GUID is hex, dashes and braces: anything else would not be one, and must not reach a query.
+    if guid.is_empty() || !guid.chars().all(|c| c.is_ascii_hexdigit() || "{}-".contains(c)) {
+        return Err("Unexpected adapter id from Windows".into());
+    }
+    Ok(guid)
+}
+
 /// Interface metric, None = automatic. IP Helper changes it now. What survives a restart is the
 /// `InterfaceMetric` value under the adapter's Tcpip key (the CIM persistent store reads and writes that same
 /// value): a number there is a manual metric, no value is automatic. No API empties it (Set-NetIPInterface

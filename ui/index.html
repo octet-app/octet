@@ -1356,7 +1356,7 @@ html.app, html.app body { overflow: hidden; }
 const adapters = [
   { id: 1, name: "Wi-Fi", ssid: "Office-5G", phy: "802.11be", mhz: 6115, speed: 2882e6, desc: "Qualcomm FastConnect 7800 Wi-Fi 7 High Band Simultaneous (HBS) Network Adapter",
     mac: "02-00-00-00-00-01", state: "up", dhcpServer: "10.0.0.1", leaseGot: Date.now() - 4 * 3600e3, leaseEnds: Date.now() + 3 * 3600e3 + 17 * 60e3,
-    suffix: "corp.local", ipv6: ["fe80::1c2a:5ff:fe3b:9a01"], wifi: { signal: 82, bssid: "5C-E9-31-7A-10-C4", security: "WPA3-Personal" },
+    suffix: "corp.local", ipv6: ["fe80::1c2a:5ff:fe3b:9a01"], ipv6On: true, wifi: { signal: 82, bssid: "5C-E9-31-7A-10-C4", security: "WPA3-Personal" },
     cfg: { ipAuto: true, address: "10.0.1.124", subnet: "255.255.254.0", gateway: "10.0.0.1", dnsAuto: true, dns1: "8.8.8.8", dns2: "8.8.4.4", register: true } },
   { id: 2, name: "Ethernet", desc: "Realtek USB GbE Family Controller", mac: "02-00-00-00-00-02", state: "down", dhcpServer: "",
     cfg: { ipAuto: false, address: "192.168.50.20", subnet: "255.255.255.0", gateway: "192.168.50.254", dnsAuto: false, dns1: "192.168.50.254", dns2: "1.1.1.1", register: true } },
@@ -1461,6 +1461,7 @@ const demoInvoke = (cmd, a = {}) => new Promise((res, rej) => setTimeout(() => {
     if (demo.outcome === "fail") return rej("The object already exists.");
     const r = a.request, x = r.op === "share" && r.on && adapters[sel];   // demo adapters carry no index
     if (x) x.cfg.address = r.scope;   // like Windows: sharing pins the adapter to its address
+    if (r.op === "ipv6") { const y = adapters[sel]; y.ipv6On = r.on; y.ipv6 = r.on ? ["fe80::1c2a:5ff:fe3b:9a01"] : []; }
     return res();
   }
   rej(`demo: ${cmd}`);
@@ -2691,6 +2692,20 @@ function leaseAction(act) {
 }
 
 // ---------- row buttons ----------
+// IP profiles: a named IP + DNS set, kept on this PC, for any adapter. Picking one fills the draft only, so Apply
+// still does the address check, the permission prompt and the test. Metrics and "first" belong to an adapter: not kept.
+const PROFILE_KEYS = ["ipAuto", "address", "subnet", "gateway", "gwMetric", "extra", "gws", "dnsAuto", "dns1", "dns2"];
+const profiles = () => { try { const v = JSON.parse(pref("octet-profiles") || "[]"); return Array.isArray(v) ? v.filter(p => p?.name && p.cfg) : []; } catch { return []; } };
+// Same name (any case): replaced. Returns the list as saved.
+function profileSave(name, cfg) {
+  name = String(name).trim(); if (!name) return profiles();
+  const cut = Object.fromEntries(PROFILE_KEYS.map(k => [k, structuredClone(cfg[k] ?? (k === "extra" || k === "gws" ? [] : ""))]));
+  const list = [...profiles().filter(p => p.name.toLowerCase() !== name.toLowerCase()), { name, cfg: cut }].sort((a, b) => a.name.localeCompare(b.name));
+  keep("octet-profiles", JSON.stringify(list)); return list;
+}
+function profileDelete(name) { const list = profiles().filter(p => p.name !== name); keep("octet-profiles", JSON.stringify(list)); return list; }
+// Onto the draft (the form then shows it as changed); a key the profile lacks stays as it is.
+function profileFill(d, p) { for (const k of PROFILE_KEYS) if (k in p.cfg) d[k] = structuredClone(p.cfg[k]); return d; }
 const presets = [
   { name: "Google", logo: "google", ips: ["8.8.8.8", "8.8.4.4"] },
   { name: "Cloudflare", logo: "cloudflare", ips: ["1.1.1.1", "1.0.0.1"] },
@@ -4612,6 +4627,8 @@ function infoRows() {
       ...(a.extraIps || []).map((x, i) => { const q = prefixOf(a.extraSubnets?.[i] || ""); return [L(`IP ${i + 2}`, `IP ${i + 2}`), x, "", q >= 0 ? `/${q}` : ""]; }),
       ["Subnet", c.subnet, ""],
       ["Gateway", c.gateway, ""],
+      // On or off for this adapter; the row itself is the switch.
+      ...(a.ipv6On === undefined ? [] : [["IPv6", a.ipv6On ? L("On", "เปิด") : L("Off", "ปิด"), a.ipv6On ? L("click to turn off", "กดเพื่อปิด") : L("click to turn on", "กดเพื่อเปิด"), "", "v6"]]),
       ...(a.ipv6 || []).map(x => ["IPv6", x, x.startsWith("fe80") ? "link-local" : ""]),
       ...(c.ipAuto && a.dhcpServer ? [[L("DHCP server", "DHCP server"), a.dhcpServer, lease]] : []),
       ...(up && validIp(c.gateway) ? [["Public IP", pub === undefined ? L("Look up", "ดูค่า") : pub === null ? L("Looking up…", "กำลังดู…") : pub?.ip || L("Couldn't reach the internet", "ออกอินเทอร์เน็ตไม่ได้"), pub === undefined ? L("asks a web service", "ถามจากเว็บภายนอก") : [pub?.isp, pub?.city, viaName(pub), pub?.err].filter(Boolean).join(" · "), "", "pub"]] : []),
@@ -4633,9 +4650,9 @@ function renderInfo() {
     rows.forEach((b, i) => {
       const [, v, note, pfx, kind] = flat[i], vs = b.querySelector(".v > span"), em = b.querySelector(".v em:not(.pfx)"), pe = b.querySelector(".pfx");
       roll(vs, v); if (em) roll(em, note || ""); if (pe) roll(pe, pfx || "");
-      const ask = kind === "pub" && !validIp(v), ic = b.querySelector(":scope > i"), want = `ph ph-${ask ? "arrow-right" : "copy"}`;
-      b.classList.toggle("ask", ask); if (ic.className !== want && !b.classList.contains("done")) popIcon(ic, want);
-      b.onclick = () => ask ? infoPublic() : infoCopy(b, v + (pfx || ""));
+      const ask = kind === "pub" && !validIp(v), ic = b.querySelector(":scope > i"), want = `ph ${infoIcon(kind, v)}`;
+      b.classList.toggle("ask", ask || kind === "v6"); if (ic.className !== want && !b.classList.contains("done")) popIcon(ic, want);
+      b.onclick = () => kind === "v6" ? infoV6() : ask ? infoPublic() : infoCopy(b, v + (pfx || ""));
     });
     return;
   }
@@ -4646,11 +4663,11 @@ function renderInfo() {
     el.innerHTML = `<div class="ihead"><i class="ph ph-${g.icon}"></i><span></span>${g.tag ? `<span class="itag">${g.tag}</span>` : ""}</div>`;
     el.querySelector(".ihead span").textContent = g.head;
     for (const [k, v, note, pfx, kind] of g.rows) {
-      const b = document.createElement("button"); b.className = "irow" + (kind === "pub" ? " pub" : "") + (kind === "pub" && !validIp(v) ? " ask" : "");
-      b.innerHTML = `<span class="k"></span><span class="v"><span></span>${pfx ? `<em class="pfx">${pfx}</em>` : ""}<em></em></span><i class="ph ph-${kind === "pub" && !validIp(v) ? "arrow-right" : "copy"}"></i>`;
+      const b = document.createElement("button"); b.className = "irow" + (kind === "pub" ? " pub" : "") + ((kind === "pub" && !validIp(v)) || kind === "v6" ? " ask" : "");
+      b.innerHTML = `<span class="k"></span><span class="v"><span></span>${pfx ? `<em class="pfx">${pfx}</em>` : ""}<em></em></span><i class="ph ${infoIcon(kind, v)}"></i>`;
       b.querySelector(".k").textContent = k; b.querySelector(".v > span").textContent = v;
       if (note) b.querySelector(".v em:not(.pfx)").textContent = note;
-      b.onclick = () => kind === "pub" && !validIp(v) ? infoPublic() : infoCopy(b, v + (pfx || ""));
+      b.onclick = () => kind === "v6" ? infoV6() : kind === "pub" && !validIp(v) ? infoPublic() : infoCopy(b, v + (pfx || ""));
       el.append(b);
     }
     return el;
@@ -4663,7 +4680,26 @@ function renderInfo() {
 function infoText() {
   const groups = infoRows(), w = Math.max(...groups.flatMap(g => g.rows.map(r => r[0].length))) + 2;
   return groups.map(g => [g.head + (g.tag ? ` (${g.tag})` : ""), ...g.rows.filter(r => r[4] !== "pub" || validIp(r[1]))
-    .map(([k, v, note, pfx]) => `  ${k.padEnd(w)}${v}${pfx || ""}${note ? `  ${note}` : ""}`)].join("\n")).join("\n\n");
+    .map(([k, v, note, pfx, kind]) => `  ${k.padEnd(w)}${v}${pfx || ""}${note && kind !== "v6" ? `  ${note}` : ""}`)].join("\n")).join("\n\n");
+}
+// A row's end icon: copy, ask (Public IP), or the IPv6 switch's state.
+const infoIcon = (kind, v) => kind === "v6" ? (adapters[sel]?.ipv6On ? "ph-toggle-right" : "ph-toggle-left") : kind === "pub" && !validIp(v) ? "ph-arrow-right" : "ph-copy";
+// IPv6 on or off for this adapter, through the same elevated change as everything else.
+async function infoV6() {
+  const a = adapters[sel]; if (!a || busyNow) return;
+  const on = !a.ipv6On;
+  say(L("Waiting for permission…", "รอสิทธิ์ Admin…")); lock(true);
+  try {
+    await change({ op: "ipv6", index: a.index, name: a.name, on });
+    if (tauri) await reload();
+    lock(false); renderList(); renderAdapterFacts(); if (page === "info") renderInfo();
+    say(on ? L("IPv6 on", "เปิด IPv6 แล้ว") : L("IPv6 off", "ปิด IPv6 แล้ว"), "ok");
+  } catch (e) {
+    if (tauri) await reload().catch(() => {});
+    lock(false); if (page === "info") renderInfo();
+    if (e === "Cancelled") say(L("Permission declined, nothing changed", "ไม่ได้ให้สิทธิ์ Admin จึงยังไม่ได้เปลี่ยนอะไร"), "", "shield-slash");
+    else say(String(e), "bad");
+  }
 }
 // An icon that changes pops in rather than blinking over.
 function popIcon(i, cls) {

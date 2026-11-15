@@ -148,6 +148,9 @@ pub(crate) fn services(prefs: &Map<String, Value>, live: &Map<String, Value>, na
             dhcp: auto,
             static_dns,
             ipv4_off: off,
+            // As for IPv4: no method, Off, or an inactive entity (networksetup -setv6off) is off.
+            ipv6_on: !matches!(s["IPv6"]["ConfigMethod"].as_str().unwrap_or(""), "" | "Off")
+                && s["IPv6"]["__INACTIVE__"].as_bool() != Some(true) && !s["IPv6"]["__INACTIVE__"].as_i64().is_some_and(|n| n != 0),
             ..Default::default()
         };
         let wifi_card = iface["Type"].as_str() == Some("IEEE80211") || iface["Hardware"].as_str() == Some("AirPort");
