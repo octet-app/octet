@@ -4481,7 +4481,7 @@ async function findNets(a, btn) {
   const own = scanRanges(a);
   if (!nets.some(n => !own.some(o => netOf(o.ip, 24) === netOf(n.ip, 24)))) {
     const f = $("scan-picks").querySelector(".sfind");
-    if (f) f.children[1].textContent = L("No other network answered", "ไม่เจอวงอื่นตอบ");
+    if (f) f.children[1].textContent = L("None answered", "ไม่มีวงไหนตอบ");
   }
 }
 $("scan-pick").onclick = e => { e.stopPropagation(); setScanPicks(!$("scan-own").classList.contains("open")); };
