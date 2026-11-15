@@ -1807,6 +1807,8 @@ const icon = (button, name) => window.morph?.[button]?.(name);
 
 function sync(from) {
   if (!draft) return;
+  // Manual IP orders gateways by metric alone: the /1 routes that put one ahead of DHCP come off on Apply.
+  if (!draft.ipAuto) draft.first = "";
   const diff = changed(), bad = problems();
   for (const k of ["address", "subnet", "gateway", "dns1", "dns2"]) {
     const f = fields[k];

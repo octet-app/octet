@@ -821,7 +821,9 @@ mod native {
                     }
                     raw.gw_metric = raw.gateway.iter().map(|g| g.parse().ok().and_then(|g| routes.get(&(raw.index, g))).copied().unwrap_or(0)).collect();
                     raw.if_metric = if_metrics.get(&raw.index).copied().unwrap_or(0);
-                    raw.first = firsts.get(&raw.index).map(|g| g.to_string()).unwrap_or_default();
+                    // Only Octet's own: a /1 through one of this adapter's gateways. A VPN puts /1 routes on its
+                    // tunnel through its own peer; taking those for `first` would let an Apply here remove them.
+                    raw.first = firsts.get(&raw.index).map(|g| g.to_string()).filter(|g| raw.gateway.contains(g)).unwrap_or_default();
                     // With a conflict, the list's order can't be trusted to put the main address first: a static
                     // adapter's main one is the first in its saved list (what `set address` wrote, and what Windows'
                     // own dialog shows), not whichever address another device happens to hold.
