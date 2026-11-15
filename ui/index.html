@@ -2030,6 +2030,7 @@ function lock(on) {
   busyNow = on;
   for (const el of [document.querySelector(".side"), document.querySelector(".scroll")]) el.inert = on;
   if (on) $("revert").disabled = $("apply").disabled = true; else sync();
+  if (page === "share") renderShare();   // Share/Stop reads busyNow too: drawn while locked, it stays grey until redrawn
 }
 
 const indicator = document.createElement("span");
