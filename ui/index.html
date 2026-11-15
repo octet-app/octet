@@ -2499,6 +2499,7 @@ function shSay(a) {
   const text = mine ? `<i class="ph ph-clock"></i> ${t >= 60 ? Math.floor(t / 60) + " " + L("min", "นาที") + " " : ""}${t % 60} ${L("s", "วิ")}`
     : other ? L(`Already sharing to ${s.name}`, `กำลังแชร์ไปที่ ${s.name} อยู่`)
     : !s && macWifiOut(a) ? L("Sharing out over Wi-Fi is set in System Settings > Sharing", "แชร์ออกทาง Wi-Fi ตั้งได้ใน System Settings > Sharing")
+    : !s && !adapters.some(x => x.id === shFrom) ? `<i class="ph ph-info"></i> ${L("Nothing to share: connect another adapter to the internet first", "ยังไม่มีเน็ตให้แชร์: ต่อเน็ตที่ Adapter อื่นก่อน")}`
     : bad ? (mac ? L("Use a private address ending in .1, e.g. 192.168.1.1", "ใช้ IP วงภายในที่ลงท้าย .1 เช่น 192.168.1.1") : L("Use a private address, e.g. 192.168.1.1", "ใช้ IP วงภายใน เช่น 192.168.1.1"))
     : mac ? `<i class="ph ph-shield-check"></i> ${L("This adapter's own settings stay as they are", "ค่าของอะแดปเตอร์นี้ไม่ถูกเปลี่ยน")}`
     : `<i class="ph ph-shield-check"></i> ${L("Current settings come back on Stop", "กดหยุดแล้วค่าเดิมกลับมา")}`;
@@ -2515,10 +2516,14 @@ function shPing(ip) {
   own.f.set(ip, true); own.el.classList.remove("empty"); pickRow(own);
 }
 function shDevPaint(a, mine) {
-  const host = $("sh-devlist"), want = shDevs.map(d => d.mac + d.ip).join();
+  // Only what our sharing gave an address: while sharing, on the shared /24. A router heard on the cable before it
+  // has one of ours (or with an address of its own elsewhere) is a shadow that only confuses.
+  const at = mine ? net24(shareMode(a).s?.scope || "192.168.137.1") : null;
+  const devs = mine ? shDevs.filter(d => d.ip && net24(d.ip) === at) : [];
+  const host = $("sh-devlist"), want = devs.map(d => d.mac + d.ip).join();
   if (host.dataset.k !== want) {
     const had = new Set([...host.children].map(r => r.dataset.mac));
-    host.replaceChildren(...shDevs.map(d => {
+    host.replaceChildren(...devs.map(d => {
       const item = document.createElement("div"); item.className = "sh-item"; item.dataset.mac = d.mac; item.setAttribute("role", "listitem");
       const r = document.createElement("div"); r.className = "sh-dev" + (d.ip ? "" : " noip"); r.dataset.mac = d.mac;
       if (had.has(d.mac)) r.style.animation = "none";
@@ -2541,7 +2546,7 @@ function shDevPaint(a, mine) {
     host.dataset.k = want;
     advEdges(host);
   }
-  $("sh-devs").classList.toggle("has", shDevs.length > 0);
+  $("sh-devs").classList.toggle("has", devs.length > 0);
   shFade($("sh-empty-text"), a.state === "disabled" ? L("Turn this adapter on first", "เปิดอะแดปเตอร์นี้ก่อน") : a.state !== "up" ? L("Plug a cable into this adapter", "เสียบสายเข้ากับอะแดปเตอร์นี้")
     : mine ? L("Waiting for a device…", "รออุปกรณ์…") : L("Devices show up here once sharing starts", "อุปกรณ์จะขึ้นที่นี่เมื่อเริ่มแชร์"));
 }
