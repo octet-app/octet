@@ -3016,7 +3016,12 @@ function updWhen() {
 document.querySelector(`input[name=updauto][value="${pref("octet-upd-auto") === "1" ? 1 : 0}"]`).checked = true; segIndex("updauto");
 document.querySelectorAll("input[name=updauto]").forEach(x => x.onchange = () => { segIndex("updauto"); keep("octet-upd-auto", x.value); });
 // Off unless asked: Octet talks to nothing outside your network on its own.
-if (pref("octet-upd-auto") === "1") setTimeout(() => upd.s === "idle" && $("s-upd-go").click(), 4000);
+// Auto: found one, download it too. The exe on disk is then the new one, so the next start runs it; Restart only brings it sooner.
+if (pref("octet-upd-auto") === "1") setTimeout(async () => {
+  if (upd.s !== "idle") return;
+  await $("s-upd-go").onclick();
+  if (upd.s === "new") $("s-upd-go").onclick();
+}, 4000);
 updShow();
 // Links open in the default browser; inside the app only these known pages can be opened.
 const links = {

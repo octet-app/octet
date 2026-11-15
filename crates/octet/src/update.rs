@@ -145,6 +145,7 @@ pub fn tidy() {
     #[cfg(not(target_os = "macos"))]
     if let Ok(me) = std::env::current_exe() {
         let _ = std::fs::remove_file(me.with_extension("exe.old"));
+        let _ = std::fs::remove_file(me.with_extension("exe.new"));
     }
 }
 

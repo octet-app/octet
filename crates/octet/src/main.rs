@@ -379,7 +379,6 @@ fn main() {
             unsafe { std::env::remove_var(k) };   // still one thread: nothing else reads the environment yet
         }
     }
-    update::tidy();
     let restarted = args.iter().any(|a| a == "--restarted");
     // After an update or a restart as admin: let the copy that started this one close first, or single-instance
     // would hand off to it (and both would be gone). Then start as usual (elevated again if set to).
@@ -388,6 +387,7 @@ fn main() {
     } else if args.iter().any(|a| a == "--updated" || a == "--restarted") {
         std::thread::sleep(std::time::Duration::from_millis(700));   // started by 0.2.0 or older, which pass no pid
     }
+    update::tidy();   // after the old copy has closed: while it runs, Octet.exe.old is locked
     if !restarted && always_admin() && !args.iter().any(|a| a == "--admin") && !net::elevated() && let Ok(exe) = std::env::current_exe() {
         // No window or single-instance lock exists yet, so the elevated copy needn't wait.
         if change::run_as_admin(&exe, "--admin", false).is_ok() {
