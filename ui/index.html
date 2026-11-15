@@ -2025,6 +2025,8 @@ function ask(text, yes, ic = "", more = "", facts = []) {
 }
 const discardOk = () => !changed().length ? Promise.resolve(true)
   : ask(L(`Discard changes to ${adapters[sel].name}?`, `ยกเลิกค่าที่แก้ของ ${adapters[sel].name}?`), L("Discard", "ทิ้ง"));
+// UAC (or the Mac password) said no. A function: L() picks the language when it is said.
+const declined = () => say(L("Permission declined, nothing changed", "ไม่ได้ให้สิทธิ์ Admin จึงยังไม่ได้เปลี่ยนอะไร"), "", "shield-slash");
 // A change that needs admin rights, outside Apply: wait for the prompt, read back what the system has (a failed one may
 // have done part), redraw, then say how it went.
 async function adminChange(req, ok) {
@@ -2034,7 +2036,7 @@ async function adminChange(req, ok) {
   if (tauri) await reload().catch(() => {});
   lock(false); renderList(); renderAdapterFacts(); renderForm(true); if (page === "info") renderInfo();
   if (!err) say(ok, "ok");
-  else if (err === "Cancelled") say(L("Permission declined, nothing changed", "ไม่ได้ให้สิทธิ์ Admin จึงยังไม่ได้เปลี่ยนอะไร"), "", "shield-slash");
+  else if (err === "Cancelled") declined();
   else say(String(err), "bad");
 }
 // While Windows is being changed, nothing else may touch the form or the list.
@@ -2214,7 +2216,7 @@ $("apply").onclick = async () => {
       lock(false); iconNow("apply", "shield-check");
       renderList();
       if (adapters[sel]?.id === a.id) { renderAdapterFacts(); renderForm(); } else renderAdapter();
-      if (err === "Cancelled") say(L("Permission declined, nothing changed", "ไม่ได้ให้สิทธิ์ Admin จึงยังไม่ได้เปลี่ยนอะไร"), "", "shield-slash");
+      if (err === "Cancelled") declined();
       else { say((adapters[sel]?.id === a.id ? "" : a.name + ": ") + L("Not applied: ", "บันทึกไม่สำเร็จ: ") + err, "bad"); $("status").title = err; }
       return;
     }
@@ -4696,7 +4698,7 @@ const infoIcon = (kind, v) => kind === "v6" ? (adapters[sel]?.ipv6On ? "ph-toggl
 function infoV6() {
   const a = adapters[sel]; if (!a || busyNow) return;
   const on = !a.ipv6On;
-  return adminChange({ op: "ipv6", index: a.index, name: a.name, on }, on ? L("IPv6 on", "เปิด IPv6 แล้ว") : L("IPv6 off", "ปิด IPv6 แล้ว"));
+  adminChange({ op: "ipv6", index: a.index, name: a.name, on }, on ? L("IPv6 on", "เปิด IPv6 แล้ว") : L("IPv6 off", "ปิด IPv6 แล้ว"));
 }
 // An icon that changes pops in rather than blinking over.
 function popIcon(i, cls) {
