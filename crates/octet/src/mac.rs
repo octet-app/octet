@@ -102,6 +102,8 @@ pub(crate) fn services(prefs: &Map<String, Value>, live: &Map<String, Value>, na
         }
     }
     let state = |k: String| live.get(&k).unwrap_or(&Value::Null);
+    // networksetup's "off" (and System Settings') marks an entity __INACTIVE__, as a bool or a number.
+    let inactive = |v: &Value| v["__INACTIVE__"].as_bool() == Some(true) || v["__INACTIVE__"].as_i64().is_some_and(|n| n != 0);
     let mut out = vec![];
     for id in ids {
         let s = &prefs["NetworkServices"][&id];
@@ -110,12 +112,12 @@ pub(crate) fn services(prefs: &Map<String, Value>, live: &Map<String, Value>, na
         let method = v4["ConfigMethod"].as_str().unwrap_or("");
         // IPv4 Off: networksetup -setv4off (and System Settings' Off) keep the method and mark the IPv4 entity
         // __INACTIVE__; no ConfigMethod at all is off too. Link-local-only and other methods have nothing to edit.
-        let off = matches!(method, "" | "Off") || v4["__INACTIVE__"].as_bool() == Some(true) || v4["__INACTIVE__"].as_i64().is_some_and(|n| n != 0);
+        let off = matches!(method, "" | "Off") || inactive(v4);
         if s.is_null() || iface["HiddenConfiguration"].as_bool() == Some(true) || matches!(iface["Type"].as_str(), Some("PPP" | "VPN" | "IPSec"))
             || !(off || matches!(method, "DHCP" | "BOOTP" | "Manual" | "INFORM")) {
             continue;
         }
-        let inactive = s["__INACTIVE__"].as_i64().is_some_and(|n| n != 0) || s["__INACTIVE__"].as_bool() == Some(true);
+        let disabled = inactive(s);
         let ipv4 = state(format!("State:/Network/Service/{id}/IPv4"));
         let dns = state(format!("State:/Network/Service/{id}/DNS"));
         let dhcp = state(format!("State:/Network/Service/{id}/DHCP"));
@@ -130,7 +132,7 @@ pub(crate) fn services(prefs: &Map<String, Value>, live: &Map<String, Value>, na
         let (set_ip, set_mask) = (ips(&v4["Addresses"]), ips(&v4["SubnetMasks"]));
         if method == "Manual" && let (Some(ip), Some(mask)) = (set_ip.first(), set_mask.first())
             && let Some((p, _)) = out.iter_mut().find(|(p, _): &&mut (Raw, bool)| p.description == dev && name == extra_name(&p.name, ip)) {
-            if !inactive {
+            if !disabled {
                 p.ip.push(ip.clone());
                 p.subnet.push(mask.clone());
                 if let Some(r) = v4["Router"].as_str().filter(|r| r.parse::<Ipv4Addr>().is_ok() && !p.gateway.iter().any(|g| g == r)) {
@@ -144,17 +146,16 @@ pub(crate) fn services(prefs: &Map<String, Value>, live: &Map<String, Value>, na
             index: index_of(dev),
             name,
             description: dev.to_string(),
-            status: if inactive { "Disabled" } else if up { "Up" } else { "Disconnected" }.into(),
+            status: if disabled { "Disabled" } else if up { "Up" } else { "Disconnected" }.into(),
             dhcp: auto,
             static_dns,
             ipv4_off: off,
             // As for IPv4: no method, Off, or an inactive entity (networksetup -setv6off) is off.
-            ipv6_on: !matches!(s["IPv6"]["ConfigMethod"].as_str().unwrap_or(""), "" | "Off")
-                && s["IPv6"]["__INACTIVE__"].as_bool() != Some(true) && !s["IPv6"]["__INACTIVE__"].as_i64().is_some_and(|n| n != 0),
+            ipv6_on: !matches!(s["IPv6"]["ConfigMethod"].as_str().unwrap_or(""), "" | "Off") && !inactive(&s["IPv6"]),
             ..Default::default()
         };
         let wifi_card = iface["Type"].as_str() == Some("IEEE80211") || iface["Hardware"].as_str() == Some("AirPort");
-        if !inactive && !off {
+        if !disabled && !off {
             // Live values when the service is up; a static service that isn't keeps what it is set to.
             let src = if ipv4.is_null() && !auto { v4 } else { ipv4 };
             (raw.ip, raw.subnet) = (ips(&src["Addresses"]), ips(&src["SubnetMasks"]));

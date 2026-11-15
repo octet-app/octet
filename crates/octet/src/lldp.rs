@@ -34,7 +34,7 @@ fn parse_cdp(f: &[u8]) -> Option<Neighbour> {
         return None;
     }
     let mut n = Neighbour { proto: "CDP", ..Default::default() };
-    // CDP header (version, ttl, checksum) is 4 bytes at 22..26; TLVs follow.
+    // After the 4-byte CDP header.
     let mut p = 26;
     while let Some(h) = f.get(p..p + 4) {
         let t = u16::from_be_bytes([h[0], h[1]]);

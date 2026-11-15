@@ -193,11 +193,6 @@ fn neighbours_for(index: u32) -> Result<Vec<(Ipv4Addr, String)>, String> {
     Ok(crate::mac::neighbours(index))
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
-fn neighbours_for(_: u32) -> Result<Vec<(Ipv4Addr, String)>, String> {
-    Err("Neighbour lookup is only available on Windows and macOS".into())
-}
-
 fn to_value<T: Serialize>(v: T) -> Result<Value, String> {
     serde_json::to_value(v).map_err(|e| e.to_string())
 }
