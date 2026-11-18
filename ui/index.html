@@ -4367,7 +4367,7 @@ $("open-speed").onclick = openSpeed;
 // ---------- Scan: who answers on this subnet ----------
 // scan_host answers { mac, vendor, ms } for an address something holds (ARP or ping), or null.
 // The page scrolls one /24 at a time, snapping, with a map in the header that lights the one on screen.
-// ponytail: up to a /22 (4 blocks, 1024 addresses); wider shows only the adapter's own /24, raise MAXB if needed.
+// ponytail: up to a /22 (4 blocks, 1024 addresses); wider sweeps only the adapter's own /24 and the gateway's, raise MAXB if needed.
 const MAXB = 4;
 const scan = { net: "", cells: [], blocks: [], hosts: {}, run: 0, done: 0, menu: null, first: 0, n: 1, starts: [0] };
 const numIp = n => [24, 16, 8, 0].map(b => (n >>> b) & 255).join(".");
