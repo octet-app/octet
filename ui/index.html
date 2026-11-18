@@ -526,7 +526,7 @@ button, input, select { font: inherit; color: inherit; }
 .sports .none { display: flex; align-items: center; gap: 6px; }
 .sports .none i { font-size: 14px; }
 
-.sfoot { flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--s3); min-height: var(--row-h); font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.sfoot { flex: 1; display: flex; align-items: center; justify-content: safe center; gap: var(--s3); min-height: var(--row-h); font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; }
 .sfoot[hidden] { display: none; }
 .sfoot b { font-weight: 400; color: var(--ink); font-variant-numeric: tabular-nums; }
 .sfoot > span > b { display: inline-block; min-width: 3ch; }   /* room for 254: the tally never shifts as it counts */
@@ -4128,7 +4128,7 @@ $("open-speed").onclick = openSpeed;
 // The page scrolls one /24 at a time, snapping, with a map in the header that lights the one on screen.
 // ponytail: up to a /22 (4 blocks, 1024 addresses); wider shows only the adapter's own /24, raise MAXB if needed.
 const MAXB = 4;
-const scan = { net: "", cells: [], blocks: [], hosts: {}, run: 0, done: 0, menu: null, first: 0, n: 1 };
+const scan = { net: "", cells: [], blocks: [], hosts: {}, run: 0, done: 0, menu: null, first: 0, n: 1, starts: [0] };
 const numIp = n => [24, 16, 8, 0].map(b => (n >>> b) & 255).join(".");
 for (let b = 0; b < MAXB; b++) {
   const g = document.createElement("div"); g.className = "sblock"; g.setAttribute("role", "rowgroup");
@@ -4162,7 +4162,9 @@ const scanBasis = a => {
 };
 const scanBase = () => { const b = scanBasis(adapters[sel]); return b ? b.ip.split(".").slice(0, 3).join(".") : ""; };
 // Is this address anywhere on the grid?
-scan.has = ip => !!scan.net && validIp(ip || "") && ipNum(ip) >= scan.first && ipNum(ip) < scan.first + scan.n * 256;
+// Blocks need not touch: a wide subnet shows your own /24 and the gateway's. `at(i)` is cell i's address.
+scan.at4 = i => (scan.starts[i >> 8] ?? 0) + (i & 255);
+scan.has = ip => !!scan.net && validIp(ip || "") && scan.starts.slice(0, scan.n).some(b => ipNum(ip) >>> 8 === b >>> 8);
 function scanStart(again = false) {
   const a = adapters[sel], basis = scanBasis(a), live = a?.state === "up" && !!basis, net = live ? scanBase() : "";
   $("scan-grid").classList.toggle("off", !live);
@@ -4170,21 +4172,23 @@ function scanStart(again = false) {
   const p = live ? basis.prefix : -1, base = live ? ipNum(basis.ip) : 0;
   Object.assign(scan, { src: live ? basis.src : "", off: live && basis.off });
   const netA = p > 0 ? (base >>> (32 - p)) << (32 - p) >>> 0 : -1, bcA = p > 0 ? (netA | (2 ** (32 - p) - 1)) >>> 0 : -1;
-  // Blocks: the whole subnet when it fits, else just the adapter's own /24.
-  const n = live && p > 0 && p < 24 && 2 ** (24 - p) <= MAXB ? 2 ** (24 - p) : 1;
-  const mine = (base >>> 8) << 8 >>> 0, first = n > 1 ? netA : mine, own = (mine - first) / 256;
+  // Blocks: the whole subnet when it fits, else the adapter's own /24, plus the gateway's when it sits in another one.
+  const fits = live && p > 0 && p < 24 && 2 ** (24 - p) <= MAXB, mine = (base >>> 8) << 8 >>> 0, gw = a?.cfg.gateway;
+  const gwB = live && !fits && !basis.off && p > 0 && p < 24 && validIp(gw || "") && inNet(gw, basis.ip, p) ? (ipNum(gw) >>> 8) << 8 >>> 0 : mine;
+  const starts = fits ? [...Array(2 ** (24 - p)).keys()].map(b => netA + b * 256) : [...new Set([mine, gwB])].sort((x, y) => x - y);
+  const n = starts.length, first = starts[0], own = starts.indexOf(mine);
   scanChips(a, basis, live);
   // A note for the footer: why this range shows less than usual.
   scan.note = !live ? "" : scan.off ? L("Past the gateway: ping only", "อยู่หลัง Gateway: ใช้ ping อย่างเดียว")
-    : n === 1 && p > 0 && p < 24 ? L(`Showing ${net}.x, too wide for all`, `แสดง ${net}.x วงใหญ่เกินจะสแกนทั้งหมด`) : "";
-  const key = `${net}|${n}|${first}|${scan.src}`;
+    : !fits && p > 0 && p < 24 ? L(`Part of a /${p}`, `บางส่วนของวง /${p}`) : "";
+  const key = `${net}|${starts}|${scan.src}`;
   if (!again && key === scan.key && scan.done) { scanTell(); return; }
   // What this network showed before (its range and gateway): when each address last answered, and whether the router stands in.
   // Filled in once the gateway's MAC is known (the key includes it: 192.168.1.x at home and at work are different networks).
   let memKey = "", mem = { ips: {} };
-  const run = ++scan.run; Object.assign(scan, { key, net, n, first, hosts: {}, done: 0, proxy: false, stand: [] });
+  const run = ++scan.run; Object.assign(scan, { key, net, n, first, starts, hosts: {}, done: 0, proxy: false, stand: [] });
   scanMenu(null);
-  scan.blocks.forEach((g, b) => { g.hidden = scan.divs[b].hidden = b >= n; scan.divs[b].innerHTML = `<span>${numIp(first + b * 256)}<i>/24</i></span>`; });
+  scan.blocks.forEach((g, b) => { g.hidden = scan.divs[b].hidden = b >= n; scan.divs[b].innerHTML = b < n ? `<span>${numIp(starts[b])}<i>/24</i></span>` : ""; });
   scanMap(n);
   $("scan-grid").classList.toggle("one", n === 1);
   // The view rides along with the sweep (top to bottom), unless you scroll yourself; then it ends on your own block.
@@ -4192,14 +4196,14 @@ function scanStart(again = false) {
   scanGo(n > 1 ? 0 : own, "instant");
   scanSpy();
   // The network and broadcast addresses are the real subnet's, wherever they fall on the grid.
-  scan.edge = i => { const v = first + i; return !live || i >= n * 256 ? "" : v === netA ? "net" : v === bcA ? "bc" : p > 24 && (v < netA || v > bcA) ? "out" : ""; };
+  scan.edge = i => { const v = scan.at4(i); return !live || i >= n * 256 ? "" : v === netA ? "net" : v === bcA ? "bc" : p > 24 && (v < netA || v > bcA) ? "out" : ""; };
   scan.cells.forEach((c, i) => {
     const e = scan.edge(i); c.className = "scell" + (e === "out" ? " out" : e ? " edge" : ""); c.textContent = e === "net" ? "NET" : e === "bc" ? "BC" : "";
     delete c.dataset.ip; delete c.dataset.tip; c.removeAttribute("aria-label");
-    if (e && e !== "out") c.dataset.tip = `${numIp(first + i)} · ` + (e === "bc" ? L("Broadcast: reaches every device here, not one", "Broadcast: ส่งถึงทุกเครื่องในวง ใช้เป็น IP ไม่ได้") : L("Network: names the subnet itself", "Network: ชื่อของวงนี้ ใช้เป็น IP ไม่ได้"));
+    if (e && e !== "out") c.dataset.tip = `${numIp(scan.at4(i))} · ` + (e === "bc" ? L("Broadcast: reaches every device here, not one", "Broadcast: ส่งถึงทุกเครื่องในวง ใช้เป็น IP ไม่ได้") : L("Network: names the subnet itself", "Network: ชื่อของวงนี้ ใช้เป็น IP ไม่ได้"));
   });
   scanTell();
-  scanCur(live ? base - first : 0, false);   // Tab lands on this PC's own address
+  scanCur(live ? own * 256 + (base & 255) : 0, false);   // Tab lands on this PC's own address
   if (!live) return;
   const todo = [...Array(n * 256).keys()].filter(i => !scan.edge(i));
   scan.total = todo.length;
@@ -4207,7 +4211,7 @@ function scanStart(again = false) {
   // and are let out a few per frame, lowest address first: the grid, ring and % move steadily.
   const q = [];
   const show = (i, got) => {
-      const ip = numIp(first + i), c = scan.cells[i]; c.dataset.ip = ip;
+      const ip = numIp(scan.at4(i)), c = scan.cells[i]; c.dataset.ip = ip;
       scan.hosts[i] = got;
       // Behind proxy ARP silence means the same as the router's stand-in answer (it rate-limits): both are likely free.
       // One or two addresses with the gateway's MAC are the router's own (an alias): in use. From the third on, it stands in for everyone.
@@ -4265,7 +4269,7 @@ function scanStart(again = false) {
   const worker = async (_, w) => {
     await ready;
     while (todo.length && run === scan.run && !(scan.proxy && w >= 16)) {
-      const i = todo.shift(), ip = numIp(first + i);
+      const i = todo.shift(), ip = numIp(scan.at4(i));
       if (!todo.length) sent = performance.now();
       const res = await confirm(ip, await scanAsk(ip, a, scan.src));
       if (run !== scan.run) return;
@@ -4299,7 +4303,7 @@ $("scan-grid").addEventListener("keydown", e => {
 function scanMap(n) {
   $("scan-map").replaceChildren(...[...Array(n > 1 ? n : 0)].map((_, b) => {
     const s = document.createElement("button"); s.className = "sseg"; s.tabIndex = -1;
-    s.dataset.tip = `${numIp(scan.first + b * 256)}/24`;
+    s.dataset.tip = `${numIp(scan.starts[b])}/24`;
     s.setAttribute("aria-label", s.dataset.tip);
     s.onclick = () => { scan.follow = false; scanGo(b); };
     return s;
@@ -4351,7 +4355,10 @@ function scanTell() {
   const f = $("scan-foot"), focus = f.contains(document.activeElement) && document.activeElement.dataset.k;
   const count = k => scan.cells.filter(c => c.classList.contains(k)).length, used = count("used"), free = count("free"), maybe = count("maybe");
   const key = (k, cls, label, n) => `<span data-k="${k}" role="button" tabindex="0"><i class="key" style="background:${cls}"></i>${label}${n !== undefined ? ` <b>${n}</b>` : ""}</span>`;
-  const html = !scan.net ? "" : (scan.note ? `<span class="snote">${scan.note}</span>` : "") + (scan.off ? "" : key("me", "var(--ok)", L("This PC", "เครื่องนี้")) + key("gw", "var(--gw)", "Gateway"))
+  // Nobody else answered on Wi-Fi: hotel and guest networks keep devices from seeing each other (client isolation).
+  const alone = scan.total && scan.done >= scan.total && !scan.off && !used && !maybe && adapters[sel]?.wifi;
+  const note = alone ? L("No one answered: this Wi-Fi may keep devices apart", "ไม่มีใครตอบ: Wi-Fi นี้อาจกันเครื่องไม่ให้เห็นกัน") : scan.note;
+  const html = !scan.net ? "" : (note ? `<span class="snote">${note}</span>` : "") + (scan.off ? "" : key("me", "var(--ok)", L("This PC", "เครื่องนี้")) + key("gw", "var(--gw)", "Gateway"))
     + key("used", "color-mix(in oklch, var(--accent) 70%, transparent)", L("In use", "ใช้อยู่"), used) + key("free", "color-mix(in oklch, var(--faint) 40%, transparent)", scan.off ? L("No answer", "ไม่ตอบ") : L("Free", "ว่าง"), free).repeat(maybe && !free ? 0 : 1)
     + (maybe ? key("maybe", "color-mix(in oklch, var(--faint) 40%, transparent)", L("Likely free", "น่าจะว่าง"), maybe) : "");
   // Called every frame of a scan: when only the counts moved, only they are written, not the whole footer.
