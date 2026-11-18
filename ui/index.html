@@ -154,7 +154,8 @@ button, input, select { font: inherit; color: inherit; }
    Facts are not settings, so they no longer borrow the form's label column. */
 .head { display: grid; grid-template-columns: minmax(0, max-content) auto 1fr auto; align-items: center; column-gap: var(--s3); }
 .head h1 { margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; display: flex; align-items: center; gap: var(--s2); min-width: 0; }
-.head h1 i { font-size: 20px; color: var(--muted); flex: none; }
+.head h1 i { font-size: 20px; color: var(--muted); flex: none; transition: color 240ms var(--ease-out); }
+.head h1 i.up { color: var(--ok); } .head h1 i.disabled { color: var(--faint); }
 /* Wi-Fi: the network it is on, after the name. It gives way (ellipsis) before the name does. */
 #a-ssid { font-weight: 400; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 100 auto; }
 #a-ssid:empty { display: none; }
@@ -1041,7 +1042,7 @@ html.app, html.app body { overflow: hidden; }
 
 /* IPv4 | IPv6 in Advanced: over the list's header row, where the "IP address" label was */
 #page-adv { position: relative; }
-#page-adv:has(.vseg:not([hidden])) .ahead { height: 26px; }
+#page-adv:has(.vseg:not([hidden])) .ahead { height: 26px; margin-bottom: var(--row-gap); }
 #page-adv:has(.vseg:not([hidden])) > .ahead > .host:first-of-type { visibility: hidden; }
 .vseg { position: absolute; left: 24px; top: 2px; z-index: 2; width: 132px; height: 26px; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr;
   padding: 2px; border: 1px solid var(--border-strong); border-radius: var(--r-item); background: var(--bg); }
@@ -1053,8 +1054,6 @@ html.app, html.app body { overflow: hidden; }
 .vseg label:has(input:checked) { color: var(--accent-ink); font-weight: 600; }
 .vseg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r-input); }
 .vseg input { position: absolute; opacity: 0; pointer-events: none; }
-.vseg .dot6 { position: absolute; top: 4px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 1.5px var(--bg); transition: background 200ms; }
-.vseg .dot6.off { background: var(--faint); }
 #page-adv.v6 > .ahead, #page-adv.v6 > .alist, .v6view { display: none; }
 #page-adv.v6 .v6view { display: block; }
 .slide-l { animation: slidel 240ms var(--ease-out); }
@@ -1211,11 +1210,11 @@ html.app, html.app body { overflow: hidden; }
           <div class="ahead" aria-hidden="true"><span class="ord"></span><span class="host">IP address</span><span class="slash"></span><span class="cidr">CIDR</span><span class="to"></span><span class="host">Gateway</span></div>
           <div class="alist" id="adv-list" role="list" aria-label="Addresses"></div>
           <div class="vseg" role="radiogroup" aria-label="Show addresses" hidden><span class="thumb"></span>
-            <label><input type="radio" name="vv" value="4" checked>IPv4</label><label><input type="radio" name="vv" value="6">IPv6<span class="dot6"></span></label></div>
+            <label><input type="radio" name="vv" value="4" checked>IPv4</label><label><input type="radio" name="vv" value="6">IPv6</label></div>
           <div class="v6view" aria-label="IPv6">
             <div class="ahead"><div class="seg onoff" role="radiogroup" aria-label="IPv6 on this adapter"><span class="thumb"></span>
-              <label class="choice"><input type="radio" name="v6on" value="on"><span>On</span></label>
-              <label class="choice"><input type="radio" name="v6on" value="off"><span>Off</span></label></div></div>
+              <label class="choice"><input type="radio" name="v6on" value="on"><span data-t="on">On</span></label>
+              <label class="choice"><input type="radio" name="v6on" value="off"><span data-t="off">Off</span></label></div></div>
             <div class="v6body"><div></div></div>
             <div class="v6off"><p></p></div>
           </div>
@@ -1603,7 +1602,7 @@ const T = {
     report: "Report a problem", feedback: "Feedback", fbBug: "A problem", fbLbl: "Report", fbWrite: "Write", fbIdea: "An idea", fbSend: "Send", sysInfo: "System", copy: "Copy", tagline: "IPv4 and DNS settings, in seconds.",
     license: "License", notices: "Third-party notices", source: "Source", 
     privacy: "Privacy", privacyText: "No telemetry, no server of its own. It only checks your network around Apply (ARP, ping) and looks up the gateway. Device makers come from a list built into the app.", credits: "Credits", inspired: "Inspired by",
-    up: "Connected", down: "Disconnected", disabled: "Disabled", noChanges: "No changes", profile: "Profile", tabIp: "IP & DNS", tabAdv: "Advanced", tabShare: "Share", tabProbe: "Ping", tabScan: "Scan", tabInfo: "Info", pAvg: "Avg", pMax: "Max", pJit: "Jitter", pLoss: "Loss",
+    up: "Connected", down: "Disconnected", disabled: "Disabled", noChanges: "No changes", profile: "Profile", on: "On", tabIp: "IP & DNS", tabAdv: "Advanced", tabShare: "Share", tabProbe: "Ping", tabScan: "Scan", tabInfo: "Info", pAvg: "Avg", pMax: "Max", pJit: "Jitter", pLoss: "Loss",
     kPages: "Go to a page", speedTest: "Speed test", isp: "ISP", cfServer: "Cloudflare", data: "Data", ping: "Ping", jitter: "Jitter", loadDown: "Loaded down", loadUp: "Loaded up", underLoad: "Under load", 
     metric: "Metric", 
     changes: n => `${n} change${n > 1 ? "s" : ""} not applied`, applied: n => `Applied to ${n}`, disable: "Disable adapter", enable: "Enable adapter",
@@ -1620,7 +1619,7 @@ const T = {
     report: "แจ้งปัญหา", feedback: "ส่งความเห็น", fbBug: "ปัญหา", fbLbl: "แจ้งเรา", fbWrite: "เขียน", fbIdea: "ไอเดีย", fbSend: "ส่ง", sysInfo: "ระบบ", copy: "คัดลอก", tagline: "ตั้งค่า IPv4 และ DNS ได้ในไม่กี่วินาที",
     license: "License", notices: "ไลบรารีที่ใช้", source: "Source code", 
     privacy: "ความเป็นส่วนตัว", privacyText: "ไม่เก็บข้อมูลการใช้งาน และไม่มีเซิร์ฟเวอร์ของตัวเอง แค่เช็กเครือข่ายตอนบันทึก (ARP, ping) และดูข้อมูล Gateway ส่วนชื่อผู้ผลิตอุปกรณ์มาจากรายชื่อที่อยู่ในแอป", credits: "เครดิต", inspired: "ได้แรงบันดาลใจจาก",
-    up: "เชื่อมต่อแล้ว", down: "ไม่ได้เชื่อมต่อ", disabled: "ปิดอยู่", noChanges: "ยังไม่ได้แก้อะไร", profile: "โปรไฟล์", tabIp: "IP & DNS", tabAdv: "ขั้นสูง", tabShare: "แชร์เน็ต", tabProbe: "Ping", tabScan: "หา IP", tabInfo: "ข้อมูล", pAvg: "เฉลี่ย", pMax: "สูงสุด", pJit: "Jitter", pLoss: "หลุด",
+    up: "เชื่อมต่อแล้ว", down: "ไม่ได้เชื่อมต่อ", disabled: "ปิดอยู่", noChanges: "ยังไม่ได้แก้อะไร", profile: "โปรไฟล์", on: "เปิด", tabIp: "IP & DNS", tabAdv: "ขั้นสูง", tabShare: "แชร์เน็ต", tabProbe: "Ping", tabScan: "หา IP", tabInfo: "ข้อมูล", pAvg: "เฉลี่ย", pMax: "สูงสุด", pJit: "Jitter", pLoss: "หลุด",
     kPages: "ไปที่หน้า", speedTest: "ทดสอบความเร็ว", isp: "ผู้ให้บริการ", cfServer: "Cloudflare", data: "ข้อมูลที่ใช้", ping: "Ping", jitter: "Jitter", loadDown: "ขณะดาวน์โหลด", loadUp: "ขณะอัปโหลด", underLoad: "ขณะใช้งานหนัก", 
     metric: "Metric", 
     changes: n => `แก้ไว้ ${n} จุด ยังไม่ได้บันทึก`, applied: n => `บันทึกค่าของ ${n} แล้ว`, disable: "ปิดการใช้งาน", enable: "เปิดการใช้งาน",
@@ -2055,7 +2054,7 @@ function renderAdapterFacts() {
   const ssid = a.state === "up" && a.ssid ? `(${a.ssid})` : "";
   retext($("a-ssid"), ssid);
   $("a-ssid").title = a.ssid ? L(`Wi-Fi network: ${a.ssid}`, `เครือข่าย Wi-Fi: ${a.ssid}`) : "";
-  $("a-icon").className = "ph " + kindIcon[kind(a)];
+  $("a-icon").className = "ph " + kindIcon[kind(a)] + (a.state === "up" || a.state === "disabled" ? " " + a.state : "");
   $("a-icon").title = kindName[kind(a)];
   retext($("a-desc"), a.desc); $("a-desc").title = a.desc;
   swDraw(); v6Draw();
@@ -2827,7 +2826,14 @@ function swVlanEdit(b) {
 }
 function swDraw(anim = false) {
   const a = adapters[sel], el = $("a-sw"), t = el.querySelector(".t");
-  if (!swOk(a)) { if (a) delete sw[a.id]; clearInterval(el._tick); el.hidden = true; el._key = ""; return; }
+  if (!swOk(a)) {
+    if (a) delete sw[a.id];
+    clearInterval(el._tick); el._key = ""; el.classList.remove("found", "anim");
+    const k = a && !mac ? kind(a) : "", why = k === "wifi" ? L("Switch port: on a cable only", "พอร์ต Switch: ดูได้เฉพาะสาย LAN") : k === "ethernet" ? L("Plug in to find the switch", "เสียบสายเพื่อหา Switch") : "";
+    el.hidden = !why; el.title = why ? L("Read from the switch's CDP or LLDP announcement", "อ่านจากประกาศ CDP หรือ LLDP ของ Switch") : "";
+    el.querySelector(".t").replaceChildren(swEl("span", "", why));
+    return;
+  }
   const s = sw[a.id] ?? (swListen(a), sw[a.id]);
   // Redrawn only when something it shows changed: renderAdapterFacts runs often, and a VLAN being typed must survive it.
   const key = JSON.stringify([a.id, s.st, s.n, a.vlan, lang]);
@@ -2931,8 +2937,7 @@ function v6Draw() {
   seg.hidden = !a || a.ipv6On === undefined;
   if (seg.hidden) { v6Show("4", false); return; }
   const on = !!a.ipv6On;
-  view.classList.toggle("off", !on); seg.querySelector(".dot6").classList.toggle("off", !on);
-  seg.querySelector(".dot6").title = on ? L("IPv6 is on", "IPv6 เปิดอยู่") : L("IPv6 is off", "IPv6 ปิดอยู่");
+  view.classList.toggle("off", !on);
   view.querySelector(`input[name=v6on][value=${on ? "on" : "off"}]`).checked = true;
   const rows = (a.ipv6 || []).map(x => {
     const [src, why] = v6src(x), r = swEl("div", "v6row" + (src === "global" ? " main" : "")), ad = swEl("span", "addr", x), s = swEl("span", "src", src);
@@ -3289,9 +3294,9 @@ const links = {
   issue: "https://github.com/octet-app/octet/issues/new",   // the app adds the version and system (Rust, main.rs)
 };
 // About: what this version brought, and the system in one line for a ticket or an issue.
-const NEWS = { v: "0.3.5",
-  en: ["Send feedback from Settings, no GitHub account needed", "macOS: Octet stays in the menu bar, with quick DNS, Renew and Flush", "macOS: DNS servers you set yourself show correctly"],
-  th: ["ส่งความเห็นได้จากการตั้งค่า ไม่ต้องมีบัญชี GitHub", "macOS: Octet อยู่บน menu bar สลับ DNS, Renew และ Flush ได้ทันที", "macOS: DNS ที่ตั้งเองแสดงถูกต้องแล้ว"] }
+const NEWS = { v: "0.4.0",
+  en: ["See the switch and port your cable goes to (CDP/LLDP), and tag a VLAN", "Profiles: save an IP setup by name, pick it on any adapter", "IPv6 in Advanced: its addresses, on or off", "Info gathers it all: switch, IPv4, IPv6, last scan and speed test"],
+  th: ["ดูว่าสายเสียบอยู่ Switch ไหน พอร์ตไหน (CDP/LLDP) และแท็ก VLAN ได้", "โปรไฟล์: บันทึกชุด IP ตั้งชื่อไว้ เลือกใช้กับอะแดปเตอร์ไหนก็ได้", "IPv6 ในหน้าขั้นสูง: ดูที่อยู่ เปิดหรือปิดได้", "หน้าข้อมูลรวมทุกอย่าง: Switch, IPv4, IPv6, ผลสแกนและทดสอบความเร็วล่าสุด"] }
 // The app asks Tauri for its version (above); the demo, here and on the website, shows the version these notes are for.
 if (!tauri) { $("s-version").textContent = NEWS.v; updShow(); }
 function renderAbout() {
@@ -4887,12 +4892,12 @@ function infoRows() {
       ...(c.ipAuto && a.dhcpServer ? [[L("DHCP server", "DHCP server"), a.dhcpServer, lease]] : []),
       ...(up && validIp(c.gateway) ? [["Public IP", pub === undefined ? L("Look up", "ดูค่า") : pub === null ? L("Looking up…", "กำลังดู…") : pub?.ip || L("Couldn't reach the internet", "ออกอินเทอร์เน็ตไม่ได้"), pub === undefined ? L("asks a web service", "ถามจากเว็บภายนอก") : [pub?.isp, pub?.city, viaName(pub), pub?.err].filter(Boolean).join(" · "), "", "pub"]] : []),
     ] },
+    ...(a.ipv6On === undefined ? [] : [{ icon: "globe", head: "IPv6", tag: a.ipv6On ? L("On", "เปิด") : L("Off", "ปิด"), rows: a.ipv6?.length ? a.ipv6.map(x => [{ global: L("Address", "ที่อยู่"), local: L("Local", "ในวง"), "link-local": "Link-local" }[v6src(x)[0]], x, ""]) : [["IPv6", a.ipv6On ? L("No address yet", "ยังไม่มี") : L("Off on this adapter", "ปิดที่อะแดปเตอร์นี้"), ""]] }]),
     { icon: "globe-simple", head: "DNS", tag: c.dnsAuto ? "DHCP" : "Manual", rows: [
       [L("Preferred", "หลัก"), c.dns1, dns(c.dns1)],
       [L("Alternate", "สำรอง"), c.dns2, dns(c.dns2)],
       [L("Suffix", "Suffix"), a.suffix || "", ""],
     ] },
-    ...(a.ipv6On === undefined ? [] : [{ icon: "globe-simple", head: "IPv6", tag: a.ipv6On ? L("On", "เปิด") : L("Off", "ปิด"), rows: a.ipv6?.length ? a.ipv6.map(x => ["IPv6", x, v6src(x)[0]]) : [["IPv6", a.ipv6On ? L("No address yet", "ยังไม่มี") : L("Off on this adapter", "ปิดที่อะแดปเตอร์นี้"), ""]] }]),
     ...(scanned ? [{ icon: "scan", head: "Scan", tag: L("this session", "รอบนี้"), rows: [
       [L("In use", "ใช้อยู่"), L(`${scanned} of ${scan.total}`, `${scanned} จาก ${scan.total}`), scan.starts.slice(0, scan.n).map(b => numIp(b) + "/24").join(", ")],
     ] }] : []),

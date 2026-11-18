@@ -235,6 +235,9 @@
 .ph.ph-github-logo:before {
   content: "\e576";
 }
+.ph.ph-globe:before {
+  content: "\e288";
+}
 .ph.ph-globe-hemisphere-west:before {
   content: "\e28c";
 }
@@ -324,6 +327,9 @@
 }
 .ph.ph-paper-plane-tilt:before {
   content: "\e398";
+}
+.ph.ph-password:before {
+  content: "\e752";
 }
 .ph.ph-path:before {
   content: "\e39c";
@@ -459,12 +465,6 @@
 }
 .ph.ph-timer:before {
   content: "\e492";
-}
-.ph.ph-toggle-left:before {
-  content: "\e674";
-}
-.ph.ph-toggle-right:before {
-  content: "\e676";
 }
 .ph.ph-translate:before {
   content: "\e4a2";
