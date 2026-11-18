@@ -2,7 +2,7 @@
 
 # Octet
 
-**Switch IPv4 and DNS in seconds. Then see who else is on the network.**
+**Switch IP and DNS in seconds, see the switch port, then see who else is on the network.**
 
 A free, open-source **IP and DNS changer** for Windows and macOS: static IP, DHCP and DNS in one click, plus a network scanner.<br>
 A fast, modern take on [Simple IP Config](https://github.com/KurtisLiggett/Simple-IP-Config), written in Rust. **[Website](https://octet-app.github.io/)**
