@@ -836,6 +836,11 @@ dialog::backdrop { background: oklch(0.2 0.02 250 / 0.35); }
 @keyframes upd-glow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
 /* Settings sections: one fixed height so switching tabs never resizes the dialog */
 .panes { min-height: 248px; }
+/* Settings: the title and tabs stay put; only the pane under them scrolls, its bar in the window's edge */
+#settings { overflow: hidden; }
+#settings > .dlg-body { height: 100%; box-sizing: border-box; grid-template-rows: auto auto minmax(0, 1fr); padding-bottom: 0; }
+#settings .panes { min-height: 0; overflow: hidden auto; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
+  margin-right: calc(-1 * var(--s6)); padding: 0 var(--s6) var(--s6) 0; }
 .pane[hidden], .set [hidden] { display: none; }
 .pane.in { animation: rise var(--t-base) var(--ease-out); }
 .keys { display: grid; grid-template-columns: auto auto 1fr; gap: 6px; align-items: center; align-content: start; font-size: 13px; }
