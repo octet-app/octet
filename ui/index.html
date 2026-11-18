@@ -160,10 +160,9 @@ button, input, select { font: inherit; color: inherit; }
 #a-ssid:empty { display: none; }
 /* Long adapter names stay on one line; the full name is in the tooltip */
 .ghost { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none; }
-#a-name, #a-ssid, #a-desc, #a-mac, #gw-name { position: relative; white-space: nowrap; }
-#a-mac .ghost { left: auto; right: 0; }   /* MAC sits on the right edge */
+#a-name, #a-ssid, #a-desc, #gw-name { position: relative; white-space: nowrap; }
 #a-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* One hardware line: what the adapter is (left, truncates) and its address (right, never cut). */
+/* One hardware line: what the adapter is (left, truncates) and the switch port its cable goes to (right). */
 .sub { grid-column: 1 / -1; margin: var(--s1) 0 0; display: flex; align-items: baseline; gap: var(--s6); font-size: 12px; line-height: 16px; color: var(--muted); }
 .desc { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Lease source sits with the DHCP choice it belongs to */
@@ -172,11 +171,6 @@ button, input, select { font: inherit; color: inherit; }
 .kv { display: inline-flex; gap: var(--s2); font-variant-numeric: tabular-nums; }
 .kv .k { color: var(--muted); }
 .kv i.k { font-size: 14px; align-self: center; transform: translateY(0.57px); }   /* glyph sits 0.57px above the digits; measured */
-/* Every pair of a MAC in its own fixed cell (as the octets of an IP field), so switching adapters never stretches it */
-#a-mac b { display: inline-block; width: 2.3ch; text-align: center; font-weight: inherit; }
-#mac-kv { gap: 5px; }
-/* The cells break text-decoration into pieces: one line under the whole MAC instead */
-#mac-kv:hover #a-mac { text-decoration: none; box-shadow: 0 1px 0 var(--border-strong); }
 .kv[hidden] { display: none; }
 .copy { border: 0; background: none; padding: 0; cursor: copy; border-radius: 2px; }
 .copy:hover .v { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
@@ -1018,6 +1012,102 @@ html.app, html.app body { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::backdrop { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+/* Switch port: right of the device name (the MAC lives in Info now) */
+.sub #a-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lk { margin-left: auto; flex: none; display: inline-flex; align-items: baseline; gap: 6px; color: var(--muted); white-space: nowrap; }
+.lk[hidden] { display: none; }
+.lk .t { display: inline-flex; align-items: baseline; gap: 4px; }
+.lk i.ph { font-size: 14px; align-self: center; color: var(--faint); transition: color 240ms var(--ease-out); }
+.lk.found i.ph { color: var(--ok); }
+.lk b { font-weight: 600; color: var(--ink); }
+.lk .sep { color: var(--faint); }
+.lk .part { display: inline-block; }
+.lk.anim .part { opacity: 0; transform: translateX(-6px); animation: lkin 220ms var(--ease-out) forwards; animation-delay: calc(40ms + var(--i) * 60ms); }
+@keyframes lkin { to { opacity: 1; transform: none; } }
+.lk .wire { display: inline-block; position: relative; align-self: center; width: 40px; height: 2px; border-radius: 1px; background: var(--border); overflow: hidden; }
+.lk .wire::after { content: ""; position: absolute; inset: 0; width: 12px; border-radius: 1px; background: var(--accent); animation: lkflow 900ms cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+@keyframes lkflow { from { transform: translateX(-12px); } to { transform: translateX(40px); } }
+.lk .secs { color: var(--faint); font-variant-numeric: tabular-nums; }
+.lk .vl, .lk .again { padding: 0 4px; margin: 0 -4px; border: 0; border-radius: var(--r-input); background: none; font: inherit; cursor: pointer; }
+.lk .vl { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.lk span.vl { cursor: default; }
+.lk .again { margin: 0; color: var(--accent); }
+.lk button:hover { background: var(--hover); }
+.lk button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lk .vl.tagged { color: var(--accent); }
+.lk input.vin { width: 46px; height: 20px; padding: 0 4px; border: 1px solid var(--accent); border-radius: var(--r-input); background: var(--surface); color: var(--ink);
+  font: inherit; font-weight: 600; text-align: center; outline: none; box-shadow: 0 0 0 1px var(--accent); }
+@media (prefers-reduced-motion: reduce) { .lk .wire::after { animation: none; width: 100%; opacity: 0.5; } .lk.anim .part { animation: none; opacity: 1; transform: none; } }
+
+/* IPv4 | IPv6 in Advanced: over the list's header row, where the "IP address" label was */
+#page-adv { position: relative; }
+#page-adv:has(.vseg:not([hidden])) .ahead { height: 26px; }
+#page-adv:has(.vseg:not([hidden])) > .ahead > .host:first-of-type { visibility: hidden; }
+.vseg { position: absolute; left: 24px; top: 2px; z-index: 2; width: 132px; height: 26px; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 2px; border: 1px solid var(--border-strong); border-radius: var(--r-item); background: var(--bg); }
+.vseg[hidden] { display: none; }
+.vseg .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); border-radius: var(--r-input); background: var(--accent); transition: transform 220ms var(--ease-out); }
+.vseg:has(input[value="6"]:checked) .thumb { transform: translateX(100%); }
+.vseg label { position: relative; z-index: 1; display: grid; place-items: center; font-size: 13px; color: var(--muted); cursor: pointer; transition: color 180ms; }
+.vseg label:hover { color: var(--ink); }
+.vseg label:has(input:checked) { color: var(--accent-ink); font-weight: 600; }
+.vseg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r-input); }
+.vseg input { position: absolute; opacity: 0; pointer-events: none; }
+.vseg .dot6 { position: absolute; top: 4px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 1.5px var(--bg); transition: background 200ms; }
+.vseg .dot6.off { background: var(--faint); }
+#page-adv.v6 > .ahead, #page-adv.v6 > .alist, .v6view { display: none; }
+#page-adv.v6 .v6view { display: block; }
+.slide-l { animation: slidel 240ms var(--ease-out); }
+.slide-r { animation: slider 240ms var(--ease-out); }
+@keyframes slidel { from { opacity: 0; transform: translateX(24px); } }
+@keyframes slider { from { opacity: 0; transform: translateX(-24px); } }
+.v6view .ahead { justify-content: flex-end; }
+.onoff { width: 98px; height: 26px; }
+.onoff .choice span { font-size: 12px; }
+.onoff:has(input[value=off]:checked) .thumb { transform: translateX(100%); }
+.v6body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 260ms var(--ease-out), opacity 200ms var(--ease-out); }
+.v6body > div { min-height: 0; overflow: hidden; }
+.v6view.off .v6body { grid-template-rows: 0fr; opacity: 0; }
+.v6row { display: flex; align-items: center; gap: 4px; height: calc(var(--row-h) + 6px); padding-bottom: 6px; box-sizing: border-box; }
+.v6row .addr { flex: 1 1 0; min-width: 0; height: var(--row-h); display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-input);
+  font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v6row.main .addr { color: var(--ink); font-weight: 600; }
+.v6row .src { width: 98px; flex: none; height: 22px; margin-left: 6px; display: inline-grid; place-items: center; border-radius: var(--r-input); background: var(--hover); color: var(--muted); font-size: 12px; }
+.v6none { margin: 0; font-size: 13px; color: var(--muted); }
+.v6off { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 260ms var(--ease-out), opacity 200ms var(--ease-out) 60ms; }
+.v6off > p { min-height: 0; overflow: hidden; margin: 0; font-size: 13px; color: var(--muted); }
+.v6view.off .v6off { grid-template-rows: 1fr; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .v6body, .v6off, .vseg .thumb { transition: none; } .slide-l, .slide-r { animation: none; } }
+
+/* Profiles: the first row of IP & DNS */
+.pfctl { position: relative; }
+.pfsel { width: var(--octets-w); height: var(--row-h); padding: 0 10px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-strong); border-radius: var(--r-input);
+  background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; text-align: left; transition: border-color 140ms, box-shadow 140ms; }
+.pfsel:hover { border-color: color-mix(in oklch, var(--accent) 45%, var(--border-strong)); }
+.pfsel[aria-expanded=true], .pfsel:focus-visible, .pfsel:focus-within { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pfsel > i { font-size: 16px; color: var(--muted); }
+.pfsel .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; position: relative; }
+.pfsel .n.custom { color: var(--muted); }
+.pfsel .caret { transition: transform 180ms var(--ease-out); }
+.pfsel[aria-expanded=true] .caret { transform: rotate(180deg); }
+.pfsel input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; outline: none; }
+.pflist { position: absolute; left: 0; top: calc(var(--row-h) + 4px); z-index: 6; width: var(--octets-w); max-height: 260px; overflow-y: auto; padding: 4px; display: grid; border: 1px solid var(--border);
+  border-radius: var(--r-item); background: var(--surface); box-shadow: 0 10px 28px oklch(0 0 0 / 0.28); transform-origin: 30% 0; animation: pfin 160ms var(--ease-out); }
+.pflist[hidden] { display: none; }
+@keyframes pfin { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+.pflist .pfrow { display: flex; align-items: center; border-radius: var(--r-input); }
+.pflist .pfrow:hover, .pflist .pfrow:focus-within { background: var(--hover); }
+.pflist .pick { flex: 1; min-width: 0; display: grid; grid-template-columns: 18px 1fr; column-gap: 8px; align-items: center; padding: 6px 8px; border: 0; background: none; color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer; outline: none; }
+.pflist .pick > span, .pflist small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pflist .pick i { font-size: 15px; color: var(--muted); grid-row: span 2; }
+.pflist .cur .pick i { color: var(--accent); }
+.pflist small { grid-column: 2; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pflist .del { width: 28px; height: 28px; margin-right: 2px; display: grid; place-items: center; border: 0; border-radius: var(--r-input); background: none; color: var(--faint); cursor: pointer; opacity: 0; }
+.pflist .pfrow:hover .del, .pflist .del:focus-visible { opacity: 1; }
+.pflist .del:hover { color: var(--bad); }
+.pflist hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+@media (prefers-reduced-motion: reduce) { .pflist { animation: none; } .pfsel .caret { transition: none; } }
 </style>
 </head>
 <body>
@@ -1048,7 +1138,7 @@ html.app, html.app body { overflow: hidden; }
             <span class="winbtns" data-win><button class="icon-btn close" id="win-close" title="Hide to tray" aria-label="Hide to tray"><i class="ph ph-x"></i></button></span>
             <p class="sub">
               <span class="desc" id="a-desc"></span>
-              <button class="kv copy" id="mac-kv" title="MAC address · click to copy" aria-label="MAC address, click to copy"><i class="ph ph-barcode k" aria-hidden="true"></i><span class="v" id="a-mac"></span></button>
+              <span class="lk" id="a-sw" aria-live="polite" hidden><i class="ph ph-network" aria-hidden="true"></i><span class="t"></span></span>
             </p>
           </div>
           <div class="menu" id="tools" role="menu" style="right:0; top:36px">
@@ -1079,6 +1169,11 @@ html.app, html.app body { overflow: hidden; }
         <div class="pages">
         <div class="page" id="page-ip" data-page="ip" role="tabpanel">
         <div class="grid form" role="group" aria-label="IP">
+          <span class="lbl" data-t="profile">Profile</span>
+          <div class="ctl"><div class="pfctl">
+            <button class="pfsel" id="pf-sel" aria-haspopup="listbox" aria-expanded="false"><i class="ph ph-stack"></i><span class="n"></span><i class="ph ph-caret-down caret"></i></button>
+            <div class="pflist" id="pf-list" role="listbox" hidden></div></div>
+            <span class="ext"><button class="slot-btn" id="pf-save" title="Save this setup as a profile" aria-label="Save this setup as a profile"><i class="ph ph-plus"></i></button></span></div>
           <span class="lbl">IP</span>
           <div class="ctl">
             <div class="seg" role="radiogroup" aria-label="IP">
@@ -1115,6 +1210,15 @@ html.app, html.app body { overflow: hidden; }
         <div class="page" id="page-adv" data-page="adv" role="tabpanel" hidden>
           <div class="ahead" aria-hidden="true"><span class="ord"></span><span class="host">IP address</span><span class="slash"></span><span class="cidr">CIDR</span><span class="to"></span><span class="host">Gateway</span></div>
           <div class="alist" id="adv-list" role="list" aria-label="Addresses"></div>
+          <div class="vseg" role="radiogroup" aria-label="Show addresses" hidden><span class="thumb"></span>
+            <label><input type="radio" name="vv" value="4" checked>IPv4</label><label><input type="radio" name="vv" value="6">IPv6<span class="dot6"></span></label></div>
+          <div class="v6view" aria-label="IPv6">
+            <div class="ahead"><div class="seg onoff" role="radiogroup" aria-label="IPv6 on this adapter"><span class="thumb"></span>
+              <label class="choice"><input type="radio" name="v6on" value="on"><span>On</span></label>
+              <label class="choice"><input type="radio" name="v6on" value="off"><span>Off</span></label></div></div>
+            <div class="v6body"><div></div></div>
+            <div class="v6off"><p></p></div>
+          </div>
         </div>
         <div class="page share" id="page-share" data-page="share" role="tabpanel" hidden>
           <div class="sh-link" id="sh-link"><div class="sh-ends">
@@ -1456,16 +1560,18 @@ const demoInvoke = (cmd, a = {}) => new Promise((res, rej) => setTimeout(() => {
     return res([t > 2 && [b + ".23", "D0-EA-11-5E-FD-33"], t > 2 && ["192.168.88.1", "D0-EA-11-5E-FD-33"], t > 8 && [b + ".88", "3C-22-FB-10-0A-91"]].filter(Boolean)); }   // an old /24 lingers, as Windows keeps it
   // MNDP: the router announces itself as soon as the cable is in, before it has an address on this side.
   if (cmd === "mndp") return res(adapters[sel]?.state === "up" ? [{ mac: "D0-EA-11-5E-FD-39", identity: "MikroTik", version: "7.16.2 (stable)", board: "RB5009UG+S+", address: "192.168.88.1", from: "192.168.88.1" }, { mac: "6C-3B-6B-D9-90-61", identity: "Office", version: "7.20.2 (stable)", board: "RB2011UiAS-2HnD", address: "10.0.0.1", from: "10.0.0.1" }] : []);
+  if (cmd === "switch_port") return res({ proto: "lldp", switch: "10WIN", port: "ether5", model: "MikroTik RB5009UG+S+", vlan: 10, mgmt: "192.168.10.254", mac: "D0-EA-11-5E-FD-39" });
   if (cmd === "change") {
     if (demo.outcome === "cancel") return rej("Cancelled");
     if (demo.outcome === "fail") return rej("The object already exists.");
     const r = a.request, x = r.op === "share" && r.on && adapters[sel];   // demo adapters carry no index
     if (x) x.cfg.address = r.scope;   // like Windows: sharing pins the adapter to its address
+    if (r.op === "vlan") adapters[sel].vlan = r.id;
     if (r.op === "ipv6") { const y = adapters[sel]; y.ipv6On = r.on; y.ipv6 = r.on ? ["fe80::1c2a:5ff:fe3b:9a01"] : []; }
     return res();
   }
   rej(`demo: ${cmd}`);
-}, cmd === "change" ? 900 : cmd === "scan_host" ? 40 + Math.random() * 160 : cmd === "public_ip" ? 700
+}, cmd === "change" ? 900 : cmd === "switch_port" ? 3400 : cmd === "scan_host" ? 40 + Math.random() * 160 : cmd === "public_ip" ? 700
   // A name nobody answers for takes seconds on a real network (DNS, LLMNR and NetBIOS all time out).
   : cmd === "hostname" && !(demo.names[a.address] ?? demo.taken[a.address]) ? 2500 : 300));
 const net = (cmd, args) => tauri ? invoke(cmd, args) : demoInvoke(cmd, args);
@@ -1497,7 +1603,7 @@ const T = {
     report: "Report a problem", feedback: "Feedback", fbBug: "A problem", fbLbl: "Report", fbWrite: "Write", fbIdea: "An idea", fbSend: "Send", sysInfo: "System", copy: "Copy", tagline: "IPv4 and DNS settings, in seconds.",
     license: "License", notices: "Third-party notices", source: "Source", 
     privacy: "Privacy", privacyText: "No telemetry, no server of its own. It only checks your network around Apply (ARP, ping) and looks up the gateway. Device makers come from a list built into the app.", credits: "Credits", inspired: "Inspired by",
-    up: "Connected", down: "Disconnected", disabled: "Disabled", noChanges: "No changes", tabIp: "IP & DNS", tabAdv: "Advanced", tabShare: "Share", tabProbe: "Ping", tabScan: "Scan", tabInfo: "Info", pAvg: "Avg", pMax: "Max", pJit: "Jitter", pLoss: "Loss",
+    up: "Connected", down: "Disconnected", disabled: "Disabled", noChanges: "No changes", profile: "Profile", tabIp: "IP & DNS", tabAdv: "Advanced", tabShare: "Share", tabProbe: "Ping", tabScan: "Scan", tabInfo: "Info", pAvg: "Avg", pMax: "Max", pJit: "Jitter", pLoss: "Loss",
     kPages: "Go to a page", speedTest: "Speed test", isp: "ISP", cfServer: "Cloudflare", data: "Data", ping: "Ping", jitter: "Jitter", loadDown: "Loaded down", loadUp: "Loaded up", underLoad: "Under load", 
     metric: "Metric", 
     changes: n => `${n} change${n > 1 ? "s" : ""} not applied`, applied: n => `Applied to ${n}`, disable: "Disable adapter", enable: "Enable adapter",
@@ -1514,7 +1620,7 @@ const T = {
     report: "แจ้งปัญหา", feedback: "ส่งความเห็น", fbBug: "ปัญหา", fbLbl: "แจ้งเรา", fbWrite: "เขียน", fbIdea: "ไอเดีย", fbSend: "ส่ง", sysInfo: "ระบบ", copy: "คัดลอก", tagline: "ตั้งค่า IPv4 และ DNS ได้ในไม่กี่วินาที",
     license: "License", notices: "ไลบรารีที่ใช้", source: "Source code", 
     privacy: "ความเป็นส่วนตัว", privacyText: "ไม่เก็บข้อมูลการใช้งาน และไม่มีเซิร์ฟเวอร์ของตัวเอง แค่เช็กเครือข่ายตอนบันทึก (ARP, ping) และดูข้อมูล Gateway ส่วนชื่อผู้ผลิตอุปกรณ์มาจากรายชื่อที่อยู่ในแอป", credits: "เครดิต", inspired: "ได้แรงบันดาลใจจาก",
-    up: "เชื่อมต่อแล้ว", down: "ไม่ได้เชื่อมต่อ", disabled: "ปิดอยู่", noChanges: "ยังไม่ได้แก้อะไร", tabIp: "IP & DNS", tabAdv: "ขั้นสูง", tabShare: "แชร์เน็ต", tabProbe: "Ping", tabScan: "หา IP", tabInfo: "ข้อมูล", pAvg: "เฉลี่ย", pMax: "สูงสุด", pJit: "Jitter", pLoss: "หลุด",
+    up: "เชื่อมต่อแล้ว", down: "ไม่ได้เชื่อมต่อ", disabled: "ปิดอยู่", noChanges: "ยังไม่ได้แก้อะไร", profile: "โปรไฟล์", tabIp: "IP & DNS", tabAdv: "ขั้นสูง", tabShare: "แชร์เน็ต", tabProbe: "Ping", tabScan: "หา IP", tabInfo: "ข้อมูล", pAvg: "เฉลี่ย", pMax: "สูงสุด", pJit: "Jitter", pLoss: "หลุด",
     kPages: "ไปที่หน้า", speedTest: "ทดสอบความเร็ว", isp: "ผู้ให้บริการ", cfServer: "Cloudflare", data: "ข้อมูลที่ใช้", ping: "Ping", jitter: "Jitter", loadDown: "ขณะดาวน์โหลด", loadUp: "ขณะอัปโหลด", underLoad: "ขณะใช้งานหนัก", 
     metric: "Metric", 
     changes: n => `แก้ไว้ ${n} จุด ยังไม่ได้บันทึก`, applied: n => `บันทึกค่าของ ${n} แล้ว`, disable: "ปิดการใช้งาน", enable: "เปิดการใช้งาน",
@@ -1817,7 +1923,7 @@ function sync(from) {
     f.box.classList.toggle("invalid", bad.some(([b]) => b === k) && draft[k] !== "" && !f.box.contains(document.activeElement));
   }
   if (from !== "prefix") { const shownMask = fields.subnet.inputs.map(shownOf).join("."), p = prefixOf(shownMask); prefix.value = p >= 0 ? p : ""; }
-  updateTags();
+  updateTags(); pfDraw();
   if (window.pagesReady) markAdv(diff, bad);
   if (bad.length && diff.length) say(bad.map(b => b[1]).join(", ") + L(" needs a valid value", " ไม่ถูกต้อง"), "bad");
   else if (diff.length) say(t("changes")(diff.length), "", "", true);
@@ -1941,35 +2047,6 @@ function retext(el, text, resize = true, build = null) {
   now.animate([{ opacity: 0 }, { opacity: 0, offset: 0.2 }, { opacity: 1 }],
     { duration: 340, easing: "ease-out" }).onfinish = () => { if (now.isConnected) put(el, text); };   // back to plain text
 }
-// A MAC as six fixed-width pairs, like the octets of an IP field: its width never changes.
-const macPairs = t => t ? t.split(":").flatMap((p, i) => {
-  const b = document.createElement("b"); b.textContent = p;
-  return i ? [":", b] : [b];
-}) : [];
-// Switching adapters: each pair counts from the old MAC to the new one in hex, as the IP octets do.
-function countMac(el, mac) {
-  const pairs = mac ? mac.split("-") : [], cells = [...el.querySelectorAll("b")];
-  if (calm.matches || pairs.length !== 6 || cells.length !== 6 || el.querySelector(".ghost, i")) {
-    el.replaceChildren(...macPairs(pairs.join(":"))); return;
-  }
-  pairs.forEach((p, j) => {
-    const x = cells[j], from = parseInt(x.dataset.final ?? x.textContent, 16) || 0, to = parseInt(p, 16);
-    const token = (x._count = (x._count || 0) + 1), hex = n => n.toString(16).toUpperCase().padStart(2, "0");
-    const next = (x.dataset.final = p.toUpperCase());
-    // Runs twice (end of the count, and the timer behind it): set from `next`, never from the deleted dataset.
-    const finish = () => { if (x._count === token) { x.textContent = next; delete x.dataset.final; } };
-    if (from === to) return finish();
-    const dur = 700, start = performance.now() + j * 40;
-    const step = now => {
-      if (x._count !== token) return;
-      const t = Math.min(1, Math.max(0, (now - start) / dur)), e = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-      x.textContent = hex(Math.round(from + (to - from) * e));
-      t < 1 ? requestAnimationFrame(step) : finish();
-    };
-    requestAnimationFrame(step);
-    setTimeout(finish, j * 40 + dur + 120);   // background windows pause rAF; never leave a stale pair
-  });
-}
 function renderAdapterFacts() {
   const a = adapters[sel];
   if (!a) return;
@@ -1981,8 +2058,7 @@ function renderAdapterFacts() {
   $("a-icon").className = "ph " + kindIcon[kind(a)];
   $("a-icon").title = kindName[kind(a)];
   retext($("a-desc"), a.desc); $("a-desc").title = a.desc;
-  countMac($("a-mac"), a.mac);   // always 17 characters: crossfade in place
-  $("mac-kv").hidden = !a.mac;   // a disabled adapter reports none
+  swDraw(); v6Draw();
   if (draft) sync();
   $("toggle-label").textContent = a.state === "disabled" ? t("enable") : t("disable");
 }
@@ -2141,14 +2217,6 @@ $("revert").onclick = () => {
   draft = structuredClone(cfgOf(adapters[sel]));
   renderForm(true);
   say(L("Back to current values", "คืนค่าเดิมแล้ว"));
-};
-$("mac-kv").onclick = () => {
-  const mac = adapters[sel].mac.replaceAll("-", ":");   // copied as shown
-  navigator.clipboard?.writeText(mac).catch(() => {});
-  const v = $("a-mac");
-  clearTimeout(v._t);
-  v.innerHTML = `<i class="ph ph-check"></i>${L("Copied", "คัดลอกแล้ว")}`; v.classList.add("copied"); replay(v, "in");
-  v._t = setTimeout(() => { v.classList.remove("copied"); v.replaceChildren(...macPairs(mac)); replay(v, "in"); }, 1200);
 };
 // Mistakes caught before asking Windows (and before a UAC prompt).
 function precheck(c) {
@@ -2716,6 +2784,169 @@ function profileSave(name, cfg) {
 function profileDelete(name) { const list = profiles().filter(p => p.name !== name); keep("octet-profiles", JSON.stringify(list)); return list; }
 // Onto the draft (the form then shows it as changed); a key the profile lacks stays as it is.
 function profileFill(d, p) { for (const k of PROFILE_KEYS) if (k in p.cfg) d[k] = structuredClone(p.cfg[k]); return d; }
+// ---- Switch port: which switch and port this cable goes to (CDP/LLDP), right of the device name ----
+// Per adapter id: { st: "listen" | "found" | "none" | "err", t0, n, at, err }. Unplugged, it's forgotten: a new cable listens again.
+const sw = {};
+const swOk = a => !!a && !mac && kind(a) === "ethernet" && a.state === "up";
+const swEl = (tag, cls, text, i) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; if (i !== undefined) e.style.setProperty("--i", i); return e; };
+function swListen(a) {
+  const s = sw[a.id] = { st: "listen", t0: Date.now() };
+  // Announcements come every 30-60 s: the wait is shown, never blocks anything.
+  net("switch_port", { id: String(a.id) })
+    .then(n => Object.assign(s, n ? { st: "found", n, at: Date.now() } : { st: "none" }), e => Object.assign(s, { st: "err", err: String(e) }))
+    .then(() => { if (sw[a.id] !== s) return; if (adapters[sel]?.id === a.id) swDraw(true); if (page === "info") renderInfo(); });
+}
+// The VLAN part: the switch's VLAN for this port, or the one this adapter tags. A button when the driver can tag (Windows only).
+function swVlan(a, n, i) {
+  const tag = a.vlan || 0, can = a.vlan != null && !mac, port = n?.vlan;
+  if (!can && !port) return null;
+  const v = swEl(can ? "button" : "span", "vl" + (tag ? " tagged" : ""), tag ? `tag ${tag}` : port ? `VLAN ${port}` : "VLAN");
+  v.title = tag && port && tag !== port ? L(`This adapter tags VLAN ${tag}, the switch says this port is VLAN ${port}`, `เครื่องนี้แท็ก VLAN ${tag} แต่ Switch บอกว่าพอร์ตนี้เป็น VLAN ${port}`)
+    : tag ? L(`This adapter tags VLAN ${tag}`, `เครื่องนี้แท็ก VLAN ${tag}`) : L("The switch's VLAN on this port", "VLAN ของพอร์ตนี้ตามที่ Switch บอก");
+  if (can) { v.title += L(" · click to change", " · กดเพื่อเปลี่ยน"); v.onclick = () => swVlanEdit(v); }
+  const w = swEl("span", "part vwrap", undefined, i); w.append(v); return w;
+}
+// Edited in place: Enter asks Windows (the admin prompt is the confirm), Esc or leaving puts it back.
+function swVlanEdit(b) {
+  const a = adapters[sel], tag = a.vlan || 0, i = swEl("input", "vin");
+  Object.assign(i, { inputMode: "numeric", maxLength: 4, placeholder: L("none", "ไม่มี"), value: tag || "" });
+  i.setAttribute("aria-label", L("VLAN to tag, empty for none", "VLAN ที่จะแท็ก เว้นว่างถ้าไม่แท็ก"));
+  b.replaceWith(i); i.focus(); i.select();
+  let over = false;
+  const done = keep => {
+    if (over) return; over = true;
+    const id = +i.value || 0;
+    $("a-sw")._key = ""; swDraw();
+    if (!keep || id === tag) return;
+    if (id > 4094) { say(L("A VLAN ID is 1 to 4094, empty for none", "VLAN ID คือ 1 ถึง 4094 เว้นว่างถ้าไม่แท็ก"), "bad", "warning"); return; }
+    adminChange({ op: "vlan", index: a.index, name: a.name, id }, id ? L(`Tagging VLAN ${id}`, `แท็ก VLAN ${id} แล้ว`) : L("No VLAN tag now", "เอาแท็ก VLAN ออกแล้ว"));
+  };
+  i.oninput = () => { i.value = i.value.replace(/\D/g, ""); };
+  i.onkeydown = e => { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); };
+  i.onblur = () => done(false);
+}
+function swDraw(anim = false) {
+  const a = adapters[sel], el = $("a-sw"), t = el.querySelector(".t");
+  if (!swOk(a)) { if (a) delete sw[a.id]; clearInterval(el._tick); el.hidden = true; el._key = ""; return; }
+  const s = sw[a.id] ?? (swListen(a), sw[a.id]);
+  // Redrawn only when something it shows changed: renderAdapterFacts runs often, and a VLAN being typed must survive it.
+  const key = JSON.stringify([a.id, s.st, s.n, a.vlan, lang]);
+  if (key === el._key && !el.hidden) return;
+  el._key = key; el.hidden = false; clearInterval(el._tick);
+  el.classList.toggle("found", s.st === "found"); el.classList.toggle("anim", anim && !calm.matches); el.title = "";
+  if (s.st === "listen") {
+    const secs = swEl("span", "secs"), wire = swEl("span", "wire"); wire.setAttribute("aria-hidden", "true");
+    t.replaceChildren(swEl("span", "", L("Finding the switch", "กำลังหา Switch")), wire, secs);
+    const tick = () => { secs.textContent = Math.max(0, 65 - Math.round((Date.now() - s.t0) / 1000)) + " s"; };
+    tick(); el._tick = setInterval(tick, 1000);
+    return;
+  }
+  if (s.st !== "found") {
+    const again = swEl("button", "again", L("Listen again", "ฟังอีกครั้ง"));
+    again.onclick = () => { swListen(a); swDraw(); };
+    const what = swEl("span", "", s.st === "none" ? L("No switch heard", "ไม่ได้ยิน Switch") : L("Switch unknown", "ไม่ทราบ Switch"));
+    el.title = s.st === "none" ? L("Nothing announced CDP or LLDP in 65 s: an unmanaged switch, or it's turned off", "ไม่มี CDP/LLDP ใน 65 วินาที: Switch ธรรมดา หรือปิดไว้") : s.err;
+    t.replaceChildren(...[what, swVlan(a, null), again].filter(Boolean));
+    return;
+  }
+  const n = s.n, b = x => { const e = swEl("b"); e.textContent = x; return e; };
+  const p1 = swEl("span", "part", undefined, 0), p2 = swEl("span", "part", undefined, 2); p1.append(b(n.switch || n.mac)); p2.append(b(n.port));
+  const v = swVlan(a, n, 4);
+  el.title = `${(n.proto || "").toUpperCase()} ${L("from", "จาก")} ${n.switch || n.mac}` + ([n.model, n.mgmt].filter(Boolean).length ? ` (${[n.model, n.mgmt].filter(Boolean).join(", ")})` : "");
+  t.replaceChildren(...[p1, swEl("span", "part sep", "›", 1), p2, v && swEl("span", "part sep", "·", 3), v].filter(Boolean));
+}
+
+// ---- Profiles: the first row of IP & DNS ----
+// Which profile the setup in `d` is: "Automatic (DHCP)" (always there), a saved one, or "" (Custom).
+const PF_IP = ["address", "subnet", "gateway", "gwMetric", "extra", "gws"], PF_DNS = ["dns1", "dns2"];
+function pfMatch(d) {
+  if (d.ipAuto && d.dnsAuto) return L("Automatic (DHCP)", "อัตโนมัติ (DHCP)");
+  return profiles().find(p => PROFILE_KEYS.every(k => !(k in p.cfg) || p.cfg.ipAuto && PF_IP.includes(k) || p.cfg.dnsAuto && PF_DNS.includes(k) || same(p.cfg[k] ?? "", d[k] ?? "")))?.name ?? "";
+}
+const pfShort = c => c.ipAuto ? L("automatic", "อัตโนมัติ") : `${c.address}/${prefixOf(c.subnet)}`;
+function pfDraw() {
+  const n = document.querySelector(".pfsel .n"); if (!n || !draft) return;
+  const name = pfMatch(draft), shown = name || L("Custom", "กำหนดเอง");
+  n.classList.toggle("custom", !name);
+  if (n.dataset.name !== shown) { n.dataset.name ? roll(n, shown) : (n.textContent = shown); n.dataset.name = shown; }   // the roll leaves ghosts in the text for a moment
+  $("pf-save").disabled = !!name || busyNow;
+}
+function pfClose() { $("pf-list").hidden = true; $("pf-sel").setAttribute("aria-expanded", false); }
+function pfOpen() {
+  const list = $("pf-list"), cur = pfMatch(draft);
+  const row = (name, sub, icon, onpick, ondel) => {
+    const r = swEl("div", "pfrow" + (name === cur ? " cur" : "")), p = swEl("button", "pick");
+    p.setAttribute("role", "option"); p.setAttribute("aria-selected", name === cur);
+    p.append(swEl("i", "ph " + (name === cur ? "ph-check" : icon)), swEl("span", "", name), swEl("small", "", sub));
+    p.onclick = () => { pfClose(); onpick(); };
+    r.append(p);
+    if (ondel) { const x = swEl("button", "del"); x.title = L(`Delete ${name}`, `ลบ ${name}`); x.setAttribute("aria-label", x.title); x.append(swEl("i", "ph ph-x")); x.onclick = e => { e.stopPropagation(); ondel(); pfOpen(); pfDraw(); }; r.append(x); }
+    return r;
+  };
+  const auto = L("Automatic (DHCP)", "อัตโนมัติ (DHCP)");
+  list.replaceChildren(row(auto, L("always here", "มีให้เสมอ"), "ph-arrows-clockwise", () => pfPick({ cfg: { ipAuto: true, dnsAuto: true } })),
+    ...(profiles().length ? [swEl("hr")] : []),
+    ...profiles().map(p => row(p.name, pfShort(p.cfg), "ph-stack", () => pfPick(p), () => profileDelete(p.name))));
+  list.hidden = false; $("pf-sel").setAttribute("aria-expanded", true);
+  (list.querySelector(".cur .pick") || list.querySelector(".pick")).focus();
+}
+function pfPick(p) { draft = profileFill(structuredClone(draft), p); renderForm(true); }
+$("pf-sel").onclick = e => { e.stopPropagation(); if (busyNow || $("pf-sel").querySelector("input")) return; $("pf-list").hidden ? pfOpen() : pfClose(); };
+$("pf-list").addEventListener("keydown", e => {
+  const picks = [...$("pf-list").querySelectorAll(".pick")], i = picks.indexOf(document.activeElement);
+  if (e.key === "Escape") { pfClose(); $("pf-sel").focus(); }
+  else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); picks[(i + (e.key === "ArrowDown" ? 1 : -1) + picks.length) % picks.length]?.focus(); }
+});
+document.addEventListener("click", e => { if (!$("pf-list").hidden && !$("pf-list").contains(e.target)) pfClose(); });
+// + : the field becomes the name box. Enter saves this setup (a name in use is replaced), Esc puts it back.
+$("pf-save").onclick = () => {
+  pfClose();
+  const s = $("pf-sel"), was = [...s.childNodes], i = swEl("input");
+  i.placeholder = L("Name this setup, then Enter", "ตั้งชื่อ แล้วกด Enter"); i.setAttribute("aria-label", L("Profile name", "ชื่อโปรไฟล์")); i.maxLength = 40;
+  s.replaceChildren(swEl("i", "ph ph-stack"), i); i.focus();
+  let over = false;
+  const end = name => {
+    if (over) return; over = true;
+    s.replaceChildren(...was);
+    if (name) { profileSave(name, draft); say(L(`Saved as ${name}`, `บันทึกเป็น ${name} แล้ว`), "ok", "check"); }
+    pfDraw(); s.focus();
+  };
+  i.onkeydown = e => { if (e.key === "Enter" && i.value.trim()) end(i.value.trim()); if (e.key === "Escape") end(""); };
+  i.onblur = () => end("");
+};
+
+// ---- IPv4 | IPv6 in Advanced: the switch sits where the "IP address" label was, so the list keeps its room ----
+const v6src = x => /^fe80/i.test(x) ? ["link-local", L("Only works on this cable", "ใช้ได้แค่ในสายเส้นนี้")]
+  : /^f[cd]/i.test(x) ? ["local", L("Unique local: inside this network only", "ใช้ในวงนี้เท่านั้น")] : ["global", L("Reaches the internet", "ออกอินเทอร์เน็ตได้")];
+function v6Show(v, anim = true) {
+  const adv = $("page-adv"), view = adv.querySelector(".v6view");
+  adv.querySelector(`.vseg input[value="${v}"]`).checked = true;
+  if (adv.classList.contains("v6") === (v === "6")) return;
+  adv.classList.toggle("v6", v === "6");
+  // The tile slides first, then the list slides in from the side it moved toward.
+  if (anim) (v === "6" ? [view] : [adv.querySelector(":scope > .ahead"), $("adv-list")]).forEach(el => { el.classList.remove("slide-l", "slide-r"); void el.offsetWidth; el.classList.add(v === "6" ? "slide-l" : "slide-r"); });
+}
+function v6Draw() {
+  const a = adapters[sel], seg = document.querySelector(".vseg"), view = document.querySelector(".v6view");
+  seg.hidden = !a || a.ipv6On === undefined;
+  if (seg.hidden) { v6Show("4", false); return; }
+  const on = !!a.ipv6On;
+  view.classList.toggle("off", !on); seg.querySelector(".dot6").classList.toggle("off", !on);
+  seg.querySelector(".dot6").title = on ? L("IPv6 is on", "IPv6 เปิดอยู่") : L("IPv6 is off", "IPv6 ปิดอยู่");
+  view.querySelector(`input[name=v6on][value=${on ? "on" : "off"}]`).checked = true;
+  const rows = (a.ipv6 || []).map(x => {
+    const [src, why] = v6src(x), r = swEl("div", "v6row" + (src === "global" ? " main" : "")), ad = swEl("span", "addr", x), s = swEl("span", "src", src);
+    ad.title = x; s.title = why; r.append(ad, s); return r;
+  });
+  view.querySelector(".v6body > div").replaceChildren(...(rows.length ? rows : [swEl("p", "v6none", L("No IPv6 address yet", "ยังไม่มี IPv6"))]));
+  view.querySelector(".v6off p").textContent = L(`IPv6 is off on ${a.name}. IPv4 is not touched.`, `IPv6 ปิดอยู่ที่ ${a.name} ไม่กระทบ IPv4`);
+}
+document.querySelectorAll(".vseg input").forEach(r => r.onchange = () => v6Show(r.value));
+// On / Off goes to Windows at once: the admin prompt is the confirm, and a No puts the switch back.
+document.querySelectorAll(".v6view input[name=v6on]").forEach(r => r.onchange = () => {
+  const a = adapters[sel], on = r.value === "on"; if (!a || busyNow || on === !!a.ipv6On) return;
+  adminChange({ op: "ipv6", index: a.index, name: a.name, on }, on ? L("IPv6 on", "เปิด IPv6 แล้ว") : L("IPv6 off", "ปิด IPv6 แล้ว"));
+});
 const presets = [
   { name: "Google", logo: "google", ips: ["8.8.8.8", "8.8.4.4"] },
   { name: "Cloudflare", logo: "cloudflare", ips: ["1.1.1.1", "1.0.0.1"] },
@@ -4621,7 +4852,10 @@ function infoRows() {
   // Windows keeps a lease that never ends as 0xFFFFFFFF seconds (the year 2106).
   const lease = !a.leaseEnds ? "" : a.leaseEnds >= 4294967295e3 ? L("never expires", "ไม่มีวันหมดอายุ")
     : a.leaseGot ? L(`${at(a.leaseGot)} to ${at(a.leaseEnds)}`, `${at(a.leaseGot)} ถึง ${at(a.leaseEnds)}`) : L(`until ${at(a.leaseEnds)}`, `ถึง ${at(a.leaseEnds)}`);
-  const pub = info.pub[pubKey(a)];
+  const pub = info.pub[pubKey(a)], s = sw[a.id], prof = pfMatch(cfgOf(a));
+  const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? L("just now", "เมื่อกี้") : L(`${m} min ago`, `${m} นาทีก่อน`); };
+  // The last scan, when it was of this adapter's network and has finished.
+  const scanned = scan.net && scan.net === scanBase() && scan.total && scan.done >= scan.total ? scan.cells.filter(x => x.classList.contains("used")).length : 0;
   return [
     { icon: "plugs-connected", head: L("Connection", "การเชื่อมต่อ"), rows: [
       [L("Computer", "ชื่อเครื่อง"), hostName, ""],
@@ -4639,14 +4873,17 @@ function infoRows() {
       ["BSSID", a.wifi.bssid, L("the access point", "ตัวกระจายสัญญาณ")],
       [L("Security", "การเข้ารหัส"), a.wifi.security, ""],
     ] : [] },
-    { icon: "map-pin", head: L("Address", "ที่อยู่"), tag: c.ipAuto ? "DHCP" : "Manual", rows: [
+    ...(s?.st === "found" ? [{ icon: "network", head: "Switch", tag: `${(s.n.proto || "").toUpperCase()} · ${ago(s.at)}`, rows: [
+      ["Switch", s.n.switch || s.n.mac, s.n.model],
+      [L("Port", "พอร์ต"), s.n.port, ""],
+      ["VLAN", s.n.vlan ? String(s.n.vlan) : "", a.vlan ? L(`this adapter tags ${a.vlan}`, `เครื่องนี้แท็ก ${a.vlan}`) : L("untagged here", "เครื่องนี้ไม่แท็ก")],
+      [L("Address", "IP"), s.n.mgmt, ""],
+    ] }] : []),
+    { icon: "map-pin", head: "IPv4", tag: (c.ipAuto ? "DHCP" : "Manual") + (prof && !c.ipAuto ? ` · ${prof}` : ""), rows: [
       ["IP", c.address, "", validIp(c.address) && p >= 0 ? `/${p}` : ""],
       ...(a.extraIps || []).map((x, i) => { const q = prefixOf(a.extraSubnets?.[i] || ""); return [L(`IP ${i + 2}`, `IP ${i + 2}`), x, "", q >= 0 ? `/${q}` : ""]; }),
       ["Subnet", c.subnet, ""],
       ["Gateway", c.gateway, ""],
-      // On or off for this adapter; the row itself is the switch.
-      ...(a.ipv6On === undefined ? [] : [["IPv6", a.ipv6On ? L("On", "เปิด") : L("Off", "ปิด"), a.ipv6On ? L("click to turn off", "กดเพื่อปิด") : L("click to turn on", "กดเพื่อเปิด"), "", "v6"]]),
-      ...(a.ipv6 || []).map(x => ["IPv6", x, x.startsWith("fe80") ? "link-local" : ""]),
       ...(c.ipAuto && a.dhcpServer ? [[L("DHCP server", "DHCP server"), a.dhcpServer, lease]] : []),
       ...(up && validIp(c.gateway) ? [["Public IP", pub === undefined ? L("Look up", "ดูค่า") : pub === null ? L("Looking up…", "กำลังดู…") : pub?.ip || L("Couldn't reach the internet", "ออกอินเทอร์เน็ตไม่ได้"), pub === undefined ? L("asks a web service", "ถามจากเว็บภายนอก") : [pub?.isp, pub?.city, viaName(pub), pub?.err].filter(Boolean).join(" · "), "", "pub"]] : []),
     ] },
@@ -4655,6 +4892,15 @@ function infoRows() {
       [L("Alternate", "สำรอง"), c.dns2, dns(c.dns2)],
       [L("Suffix", "Suffix"), a.suffix || "", ""],
     ] },
+    ...(a.ipv6On === undefined ? [] : [{ icon: "globe-simple", head: "IPv6", tag: a.ipv6On ? L("On", "เปิด") : L("Off", "ปิด"), rows: a.ipv6?.length ? a.ipv6.map(x => ["IPv6", x, v6src(x)[0]]) : [["IPv6", a.ipv6On ? L("No address yet", "ยังไม่มี") : L("Off on this adapter", "ปิดที่อะแดปเตอร์นี้"), ""]] }]),
+    ...(scanned ? [{ icon: "scan", head: "Scan", tag: L("this session", "รอบนี้"), rows: [
+      [L("In use", "ใช้อยู่"), L(`${scanned} of ${scan.total}`, `${scanned} จาก ${scan.total}`), scan.starts.slice(0, scan.n).map(b => numIp(b) + "/24").join(", ")],
+    ] }] : []),
+    ...(speed.state === "done" ? [{ icon: "gauge", head: L("Speed test", "ทดสอบความเร็ว"), tag: L("last run", "ครั้งล่าสุด"), rows: [
+      [L("Download", "ดาวน์โหลด"), speed.res.down != null ? `${(+speed.res.down).toFixed(1)} Mbps` : "", ""],
+      [L("Upload", "อัปโหลด"), speed.res.up != null ? `${(+speed.res.up).toFixed(1)} Mbps` : "", ""],
+      ["Ping", speed.res.ms != null ? `${speed.res.ms} ms` : "", speed.res.downLoad != null ? L(`${speed.res.downLoad} ms under load`, `${speed.res.downLoad} ms ตอนโหลด`) : ""],
+    ] }] : []),
   ].map(g => ({ ...g, rows: g.rows.filter(r => r[1]) })).filter(g => g.rows.length);
 }
 function renderInfo() {
@@ -4668,8 +4914,8 @@ function renderInfo() {
       const [, v, note, pfx, kind] = flat[i], vs = b.querySelector(".v > span"), em = b.querySelector(".v em:not(.pfx)"), pe = b.querySelector(".pfx");
       roll(vs, v); if (em) roll(em, note || ""); if (pe) roll(pe, pfx || "");
       const ask = kind === "pub" && !validIp(v), ic = b.querySelector(":scope > i"), want = `ph ${infoIcon(kind, v)}`;
-      b.classList.toggle("ask", ask || kind === "v6"); if (ic.className !== want && !b.classList.contains("done")) popIcon(ic, want);
-      b.onclick = () => kind === "v6" ? infoV6() : ask ? infoPublic() : infoCopy(b, v + (pfx || ""));
+      b.classList.toggle("ask", ask); if (ic.className !== want && !b.classList.contains("done")) popIcon(ic, want);
+      b.onclick = () => ask ? infoPublic() : infoCopy(b, v + (pfx || ""));
     });
     return;
   }
@@ -4680,11 +4926,11 @@ function renderInfo() {
     el.innerHTML = `<div class="ihead"><i class="ph ph-${g.icon}"></i><span></span>${g.tag ? `<span class="itag">${g.tag}</span>` : ""}</div>`;
     el.querySelector(".ihead span").textContent = g.head;
     for (const [k, v, note, pfx, kind] of g.rows) {
-      const b = document.createElement("button"); b.className = "irow" + (kind === "pub" ? " pub" : "") + ((kind === "pub" && !validIp(v)) || kind === "v6" ? " ask" : "");
+      const b = document.createElement("button"); b.className = "irow" + (kind === "pub" ? " pub" : "") + (kind === "pub" && !validIp(v) ? " ask" : "");
       b.innerHTML = `<span class="k"></span><span class="v"><span></span>${pfx ? `<em class="pfx">${pfx}</em>` : ""}<em></em></span><i class="ph ${infoIcon(kind, v)}"></i>`;
       b.querySelector(".k").textContent = k; b.querySelector(".v > span").textContent = v;
       if (note) b.querySelector(".v em:not(.pfx)").textContent = note;
-      b.onclick = () => kind === "v6" ? infoV6() : kind === "pub" && !validIp(v) ? infoPublic() : infoCopy(b, v + (pfx || ""));
+      b.onclick = () => kind === "pub" && !validIp(v) ? infoPublic() : infoCopy(b, v + (pfx || ""));
       el.append(b);
     }
     return el;
@@ -4697,16 +4943,10 @@ function renderInfo() {
 function infoText() {
   const groups = infoRows(), w = Math.max(...groups.flatMap(g => g.rows.map(r => r[0].length))) + 2;
   return groups.map(g => [g.head + (g.tag ? ` (${g.tag})` : ""), ...g.rows.filter(r => r[4] !== "pub" || validIp(r[1]))
-    .map(([k, v, note, pfx, kind]) => `  ${k.padEnd(w)}${v}${pfx || ""}${note && kind !== "v6" ? `  ${note}` : ""}`)].join("\n")).join("\n\n");
+    .map(([k, v, note, pfx, kind]) => `  ${k.padEnd(w)}${v}${pfx || ""}${note ? `  ${note}` : ""}`)].join("\n")).join("\n\n");
 }
-// A row's end icon: copy, ask (Public IP), or the IPv6 switch's state.
-const infoIcon = (kind, v) => kind === "v6" ? (adapters[sel]?.ipv6On ? "ph-toggle-right" : "ph-toggle-left") : kind === "pub" && !validIp(v) ? "ph-arrow-right" : "ph-copy";
-// IPv6 on or off for this adapter, through the same elevated change as everything else.
-function infoV6() {
-  const a = adapters[sel]; if (!a || busyNow) return;
-  const on = !a.ipv6On;
-  adminChange({ op: "ipv6", index: a.index, name: a.name, on }, on ? L("IPv6 on", "เปิด IPv6 แล้ว") : L("IPv6 off", "ปิด IPv6 แล้ว"));
-}
+// A row's end icon: copy, or ask (Public IP).
+const infoIcon = (kind, v) => kind === "pub" && !validIp(v) ? "ph-arrow-right" : "ph-copy";
 // An icon that changes pops in rather than blinking over.
 function popIcon(i, cls) {
   i.className = cls;
