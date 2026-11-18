@@ -428,7 +428,7 @@ button, input, select { font: inherit; color: inherit; }
 .sfoot.busy > span[data-k] { cursor: default; color: var(--muted); }   /* nothing to point at until the sweep is done */
 .sfoot > span[data-k].on { background: color-mix(in oklch, var(--accent) 12%, transparent); color: var(--ink); }
 /* Info: what this adapter has, read-only, grouped. A row copies its value; the footer copies it all as text. */
-#page-info:not([hidden]) { display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; }
+#page-info:not([hidden]) { display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; scrollbar-gutter: stable; }
 .info { display: flex; flex-direction: column; }
 .igroup { display: grid; grid-template-columns: 120px minmax(0, 1fr) 20px; padding: var(--s2) 0; }
 .igroup + .igroup { border-top: 1px solid var(--border); }
@@ -4910,6 +4910,9 @@ function infoRows() {
 }
 function renderInfo() {
   if (!adapters[sel]) { $("info-list").replaceChildren(); info.shape = ""; return; }   // none to show (all hidden, or the read failed)
+  // Public IP is looked up as Info opens (once per adapter and network); a failed one waits for a click.
+  const a = adapters[sel];
+  if (a.state === "up" && validIp(a.cfg.gateway) && info.pub[pubKey(a)] === undefined) { infoPublic(); return; }
   const groups = infoRows(), list = $("info-list");
   // Same rows as on screen (only values differ): roll the values that changed and keep the rest still.
   const shape = JSON.stringify(groups.map(g => [g.head, g.tag, g.rows.map(r => [r[0], r[4] || ""])]));
