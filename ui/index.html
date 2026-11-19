@@ -3302,9 +3302,9 @@ const links = {
   issue: "https://github.com/octet-app/octet/issues/new",   // the app adds the version and system (Rust, main.rs)
 };
 // About: what this version brought, and the system in one line for a ticket or an issue.
-const NEWS = { v: "0.4.1",
-  en: ["See the switch and port your cable goes to (CDP/LLDP), and tag a VLAN", "Profiles: save an IP setup by name, pick it on any adapter", "IPv6 in Advanced: its addresses, on or off", "Info gathers it all: switch, IPv4, IPv6, last scan and speed test", "Share: Stop works with the cable out, and an extra address no longer hides the sharing or its devices"],
-  th: ["ดูว่าสายเสียบอยู่ Switch ไหน พอร์ตไหน (CDP/LLDP) และแท็ก VLAN ได้", "โปรไฟล์: บันทึกชุด IP ตั้งชื่อไว้ เลือกใช้กับอะแดปเตอร์ไหนก็ได้", "IPv6 ในหน้าขั้นสูง: ดูที่อยู่ เปิดหรือปิดได้", "หน้าข้อมูลรวมทุกอย่าง: Switch, IPv4, IPv6, ผลสแกนและทดสอบความเร็วล่าสุด", "แชร์เน็ต: กดหยุดได้แม้สายหลุด และ IP เสริมไม่ทำให้สถานะหรือรายชื่ออุปกรณ์หายอีก"] }
+const NEWS = { v: "0.4.2",
+  en: ["Feedback has its own tab in Settings: pick A problem or An idea, write, Send. No account needed", "About's Report a problem opens it"],
+  th: ["ส่งความเห็นมีแท็บของตัวเองในการตั้งค่า: เลือกปัญหาหรือไอเดีย เขียน แล้วกดส่ง ไม่ต้องมีบัญชี", "แจ้งปัญหาในหน้าเกี่ยวกับพาไปที่แท็บนี้"] }
 // The app asks Tauri for its version (above); the demo, here and on the website, shows the version these notes are for.
 if (!tauri) { $("s-version").textContent = NEWS.v; updShow(); }
 function renderAbout() {
