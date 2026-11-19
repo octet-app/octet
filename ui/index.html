@@ -1871,7 +1871,7 @@ function problems() {
     if (draft.gateway && !validIp(draft.gateway)) out.push(["gateway", t("gateway")]);
   }
   {
-    draft.extra.forEach((x, i) => { if (!validIp(x.address) || prefixOf(x.subnet) < 1 || x.address === draft.address) out.push([`extra${i}`, `${t("ip")} ${i + 2}`]); });
+    draft.extra.forEach((x, i) => { if (!validIp(x.address) || prefixOf(x.subnet) < 1 || x.address === draft.address) out.push([`extra${i}`, `${t("ip")} ${i + 2}` + (validIp(x.address) && prefixOf(x.subnet) < 1 ? " CIDR" : "")]); });
     // A metric Windows already has passes as it is, even past 9999 (a VPN's routes): only typed ones are checked.
     const now = cfgOf(adapters[sel]);
     draft.gws.forEach((g, i) => { if (!validIp(g.gateway) || !okMetric(g.metric) && g.metric !== now.gws.find(x => x.gateway === g.gateway)?.metric) out.push([`gw${i}`, `${t("gateway")} ${i + 2}`]); });
@@ -3614,7 +3614,11 @@ function advRow() {
   el.append(ord, ipHost, sl, pre, to, gwHost);
   // The empty row turns real on the first keystroke.
   const real = () => { if (row === adv.ph) promote(row); return at(); };
-  row.ipf = ipField(ipHost, `advip${advUid++}`, true, false, v => { const n = real(); putAddr(n, { ...addrAt(n), address: v }); sync("adv"); });
+  // A whole address with no CIDR yet gets /24, shown in the box: the gateway column stays optional.
+  row.ipf = ipField(ipHost, `advip${advUid++}`, true, false, v => {
+    const n = real(); if (validIp(v) && pre.value === "") pre.value = 24;
+    putAddr(n, { ...addrAt(n), address: v, ...(pre.value !== "" && { subnet: masks[+pre.value] ?? "" }) }); sync("adv");
+  });
   row.gwf = ipField(gwHost, `advgw${advUid++}`, true, false, v => {
     real();
     const gs = gwsOf(draft);
