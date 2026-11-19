@@ -2453,7 +2453,7 @@ function shareMode(a) {
 const shScopeBad = v => !privateIp(v) || mac && !/\.1$/.test(v);
 const macWifiOut = a => mac && kind(a) === "wifi";
 // This Mac's own address on the shared network (the one macOS shares from), else the one chosen.
-const shOwn = (a, s) => mac ? (s && (macShare?.address || s.scope)) || a.cfg.address || "" : a.cfg.address || "";
+const shOwn = (a, s) => mac ? (s && (macShare?.address || s.scope)) || a.cfg.address || "" : (s?.scope && ownsIp(a, s.scope) ? s.scope : a.cfg.address) || "";   // an extra address may be listed first
 const net24 = ip => ip.split(".").slice(0, 3).join(".");
 const shareSources = a => adapters.filter(x => x !== a && x.state === "up" && x.cfg.gateway);
 const srcSub = x => x.ssid || x.cfg.address;
@@ -2669,10 +2669,10 @@ async function shareLook() {
   } finally { shBusy = false; }
 }
 function shSweep(a) {
-  const base = a.cfg.address.split(".").slice(0, 3).join(".");
-  const ips = Array.from({ length: 254 }, (_, i) => `${base}.${i + 1}`).filter(ip => ip !== a.cfg.address);
+  const own = shOwn(a, sharing()), base = net24(own);
+  const ips = Array.from({ length: 254 }, (_, i) => `${base}.${i + 1}`).filter(ip => ip !== own);
   let at = 0;
-  const lane = async () => { while (at < ips.length && page === "share") await scanAsk(ips[at++], a); };
+  const lane = async () => { while (at < ips.length && page === "share") await scanAsk(ips[at++], a, own); };
   Promise.all(Array.from({ length: 16 }, lane));
 }
 setInterval(shareLook, 3000);
