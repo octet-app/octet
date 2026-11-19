@@ -2446,7 +2446,7 @@ function shareMode(a) {
   if (!s || !a) return { mode: "off" };
   if (s.id !== a.id) return { mode: "other", s };
   const gone = mac ? !!macShare && !(macShare.on && macShare.private.includes(a.index))
-    : a.state === "up" && !!a.cfg.address && a.cfg.address !== (s.scope || "192.168.137.1");
+    : a.state === "up" && !!a.cfg.address && !ownsIp(a, s.scope || "192.168.137.1");   // any of its addresses: an extra one may be listed first
   return { mode: gone ? "gone" : "on", s };
 }
 // macOS gives this Mac the shared network's .1 and Wi-Fi out makes a hotspot (System Settings does that one).
@@ -2700,7 +2700,7 @@ $("share-go").onclick = async () => {
       // ARP only reaches the cable when the address is on this adapter's network now; elsewhere it would wait
       // out its 3 s timeout for nothing, so a MikroTik's own announced address is the check there.
       const onLink = a.state === "up" && !!a.cfg.address && net24(a.cfg.address) === net24(scope);
-      if (scope !== a.cfg.address) {
+      if (!ownsIp(a, scope)) {
         note(L("Checking address…", "กำลังเช็ก IP ซ้ำ…"));
         const owner = shMndp.find(m => m.address === scope)?.mac ?? (onLink ? await net("who_has", { address: scope }).catch(() => null) : null);
         if (owner && owner !== a.mac) {
