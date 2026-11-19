@@ -147,9 +147,28 @@ pub fn set_address(index: u32, static_ip: Option<(&str, &str)>) -> Result<()> {
     {
         let wmi = Wmi::connect(r"ROOT\CIMV2")?;
         let cfg = wmi.one(&format!("SELECT * FROM Win32_NetworkAdapterConfiguration WHERE InterfaceIndex={index}"), None)?;
-        match static_ip {
-            Some((ip, mask)) => wmi.call(&cfg, "EnableStatic", &[("IPAddress", strings(&[ip])?), ("SubnetMask", strings(&[mask])?)])?,
-            None => wmi.call(&cfg, "EnableDHCP", &[])?,
+        let done = match static_ip {
+            Some((ip, mask)) => wmi.call(&cfg, "EnableStatic", &[("IPAddress", strings(&[ip])?), ("SubnetMask", strings(&[mask])?)]),
+            None => wmi.call(&cfg, "EnableDHCP", &[]),
+        };
+        // 84 is "IP not enabled on adapter": WMI's answer while the cable is out (Stop sharing with no cable, say).
+        // netsh writes the setting anyway, and Windows uses it once the cable is back.
+        if let Err(e) = done {
+            if !e.ends_with("(WMI code 84)") {
+                return Err(e);
+            }
+            let mut c = crate::hidden("netsh");
+            c.args(["interface", "ipv4", "set", "address", &format!("name={index}")]);
+            match static_ip {
+                Some((ip, mask)) => c.args(["source=static", &format!("address={ip}"), &format!("mask={mask}")]),
+                None => c.arg("source=dhcp"),
+            };
+            let o = c.output().map_err(|e| e.to_string())?;
+            let text = crate::change::oem_text(&o.stdout);
+            // On DHCP already: nothing to do, as WMI would have said.
+            if !o.status.success() && !text.contains("DHCP is already enabled") {
+                return Err(text.trim().to_string());
+            }
         }
     }
     let wmi = Wmi::connect(r"ROOT\StandardCimv2")?;
