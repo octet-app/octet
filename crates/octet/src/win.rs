@@ -152,22 +152,19 @@ pub fn set_address(index: u32, static_ip: Option<(&str, &str)>) -> Result<()> {
             None => wmi.call(&cfg, "EnableDHCP", &[]),
         };
         // 84 is "IP not enabled on adapter": WMI's answer while the cable is out (Stop sharing with no cable, say).
-        // netsh writes the setting anyway, and Windows uses it once the cable is back.
+        // Set-NetIPInterface's own way (MSFT_NetIPInterface.Dhcp) is tried then; the address is added as New-NetIPAddress does.
         if let Err(e) = done {
             if !e.ends_with("(WMI code 84)") {
                 return Err(e);
             }
-            let mut c = crate::hidden("netsh");
-            c.args(["interface", "ipv4", "set", "address", &format!("name={index}")]);
-            match static_ip {
-                Some((ip, mask)) => c.args(["source=static", &format!("address={ip}"), &format!("mask={mask}")]),
-                None => c.arg("source=dhcp"),
-            };
-            let o = c.output().map_err(|e| e.to_string())?;
-            let text = crate::change::oem_text(&o.stdout);
-            // On DHCP already: nothing to do, as WMI would have said.
-            if !o.status.success() && !text.contains("DHCP is already enabled") {
-                return Err(text.trim().to_string());
+            let wmi = Wmi::connect(r"ROOT\StandardCimv2")?;
+            let ipif = wmi.one(&format!("SELECT * FROM MSFT_NetIPInterface WHERE InterfaceIndex={index} AND AddressFamily=2"), None)?;
+            put(&ipif, "Dhcp", &VARIANT::from(u32::from(static_ip.is_none())))?;
+            unsafe { wmi.svc.PutInstance(&ipif, WBEM_GENERIC_FLAG_TYPE(WBEM_FLAG_UPDATE_ONLY.0), None, None) }.map_err(|e| format!("Could not set DHCP: {e}"))?;
+            if let Some((ip, mask)) = static_ip {
+                let p: std::net::Ipv4Addr = mask.parse().map_err(|_| "Bad subnet mask")?;
+                delete(&wmi, &format!("SELECT * FROM MSFT_NetIPAddress WHERE InterfaceIndex={index} AND AddressFamily=2 AND PrefixOrigin=1"))?;
+                extra_address(index, ip, Some(u32::from(p).count_ones() as u8))?;
             }
         }
     }
