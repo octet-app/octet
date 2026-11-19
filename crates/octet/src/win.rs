@@ -159,7 +159,7 @@ pub fn set_address(index: u32, static_ip: Option<(&str, &str)>) -> Result<()> {
             }
             let wmi = Wmi::connect(r"ROOT\StandardCimv2")?;
             let ipif = wmi.one(&format!("SELECT * FROM MSFT_NetIPInterface WHERE InterfaceIndex={index} AND AddressFamily=2"), None)?;
-            put(&ipif, "Dhcp", &VARIANT::from(u32::from(static_ip.is_none())))?;
+            put(&ipif, "Dhcp", &VARIANT::from(u8::from(static_ip.is_none())))?;   // uint8, as PrefixLength
             unsafe { wmi.svc.PutInstance(&ipif, WBEM_GENERIC_FLAG_TYPE(WBEM_FLAG_UPDATE_ONLY.0), None, None) }.map_err(|e| format!("Could not set DHCP: {e}"))?;
             if let Some((ip, mask)) = static_ip {
                 let p: std::net::Ipv4Addr = mask.parse().map_err(|_| "Bad subnet mask")?;
